@@ -1,6 +1,8 @@
 import { useState, useRef, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useCommunity } from '../context/CommunityContext';
+import { storage } from '../firebase/config';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import './Community.css';
 
 const Community = () => {
@@ -138,17 +140,22 @@ const Community = () => {
 
   const handleImageChange = async (e) => {
     const file = e.target.files[0];
-    if (!file) return;
-
-    try {
-      setIsUploading(true);
-      const imageUrl = await uploadImage(file);
-      setPostImage(imageUrl);
-    } catch (error) {
-      console.error('Error uploading image:', error);
-      setError('Failed to upload image');
-    } finally {
-      setIsUploading(false);
+    if (file) {
+      try {
+        // Create a reference to the file location in Firebase Storage
+        const storageRef = ref(storage, `post-images/${Date.now()}-${file.name}`);
+        
+        // Upload the file
+        await uploadBytes(storageRef, file);
+        
+        // Get the download URL
+        const downloadURL = await getDownloadURL(storageRef);
+        
+        setSelectedImage(downloadURL);
+      } catch (error) {
+        console.error('Error uploading image:', error);
+        alert('Error uploading image. Please try again.');
+      }
     }
   };
 
