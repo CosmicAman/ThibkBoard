@@ -14,14 +14,16 @@
 .editor-header {
   display: flex;
   align-items: center;
-  padding: 8px 12px;
+  padding: 0 10px;
+  height: 35px;
+  min-height: 35px;
   background-color: #252526;
   border-bottom: 1px solid #333;
 }
 
 .editor-title {
   color: #cccccc;
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 500;
   text-transform: uppercase;
   letter-spacing: 0.5px;
@@ -32,6 +34,19 @@
   .editor-container {
     height: 300px;
   }
+  
+  .editor-header {
+    height: 32px;
+    min-height: 32px;
+  }
+  
+  .editor-title {
+    font-size: 12px;
+  }
+  
+  .monaco-editor {
+    font-size: 14px !important;
+  }
 }
 
 @media (max-width: 768px) {
@@ -40,11 +55,22 @@
   }
   
   .editor-header {
-    padding: 6px 10px;
+    height: 30px;
+    min-height: 30px;
+    padding: 0 8px;
   }
   
   .editor-title {
     font-size: 11px;
+  }
+  
+  .monaco-editor {
+    font-size: 13px !important;
+  }
+  
+  /* Adjust suggestion widget for mobile */
+  .monaco-editor .suggest-widget {
+    max-width: 280px !important;
   }
 }
 
@@ -54,12 +80,121 @@
   }
   
   .editor-header {
-    padding: 4px 8px;
+    height: 28px;
+    min-height: 28px;
+    padding: 0 6px;
   }
   
   .editor-title {
     font-size: 10px;
   }
+  
+  .monaco-editor {
+    font-size: 12px !important;
+  }
+  
+  /* Further adjust suggestion widget for smaller screens */
+  .monaco-editor .suggest-widget {
+    max-width: 240px !important;
+  }
+  
+  /* Adjust parameter hints for smaller screens */
+  .monaco-editor .parameter-hints-widget {
+    max-width: 240px !important;
+  }
+}
+
+/* Small mobile devices (375px and below) */
+@media (max-width: 375px) {
+  .editor-header {
+    height: 26px;
+    min-height: 26px;
+    padding: 0 5px;
+  }
+  
+  .editor-title {
+    font-size: 9px;
+  }
+  
+  .monaco-editor {
+    font-size: 11px !important;
+  }
+  
+  /* Optimize suggestion widget for very small screens */
+  .monaco-editor .suggest-widget {
+    max-width: 200px !important;
+  }
+  
+  /* Optimize parameter hints for very small screens */
+  .monaco-editor .parameter-hints-widget {
+    max-width: 200px !important;
+  }
+}
+
+/* Touch Device Optimizations */
+@media (hover: none) and (pointer: coarse) {
+  .monaco-editor .monaco-scrollable-element {
+    -webkit-overflow-scrolling: touch;
+  }
+  
+  .monaco-editor .view-lines {
+    touch-action: pan-y;
+  }
+  
+  /* Increase touch targets */
+  .monaco-editor .cursor {
+    width: 2px !important;
+  }
+  
+  .monaco-editor .suggest-widget {
+    touch-action: pan-y;
+  }
+  
+  .monaco-editor .parameter-hints-widget {
+    touch-action: pan-y;
+  }
+}
+
+/* Scrollbar Styles */
+.monaco-editor .monaco-scrollable-element .scrollbar {
+  width: 8px !important;
+}
+
+.monaco-editor .monaco-scrollable-element .scrollbar.vertical {
+  right: 0 !important;
+}
+
+@media (max-width: 480px) {
+  .monaco-editor .monaco-scrollable-element .scrollbar {
+    width: 6px !important;
+  }
+}
+
+/* Fix for mobile keyboard issues */
+@media (max-width: 768px) {
+  .monaco-editor-background {
+    position: relative !important;
+  }
+  
+  .monaco-editor .inputarea {
+    position: fixed !important;
+    width: 1px !important;
+    height: 1px !important;
+    min-width: 1px !important;
+    min-height: 1px !important;
+    opacity: 0 !important;
+  }
+}
+
+/* Ensure proper line height on all screen sizes */
+.monaco-editor .view-line {
+  line-height: 1.5 !important;
+}
+
+/* Fix for content overflow */
+.monaco-editor .lines-content {
+  width: 100% !important;
+  word-wrap: break-word !important;
 }
 
 /* Dark mode styles */
@@ -94,7 +229,9 @@
 
 /* Monaco Editor Styling */
 .monaco-editor {
-  padding: 8px;
+  padding: 0 !important;
+  height: 100% !important;
+  overflow: hidden !important;
 }
 
 .monaco-editor .margin {
@@ -105,8 +242,49 @@
   background-color: #1e1e1e !important;
 }
 
-.monaco-editor .scroll-decoration {
-  box-shadow: none !important;
+/* Fix typing issues */
+.monaco-editor .view-overlays {
+  position: absolute !important;
+}
+
+.monaco-editor .cursor {
+  position: absolute !important;
+  z-index: 10 !important;
+}
+
+.monaco-editor .suggest-widget {
+  z-index: 40 !important;
+}
+
+.monaco-editor .suggest-widget.visible {
+  z-index: 40 !important;
+}
+
+.monaco-editor .parameter-hints-widget {
+  z-index: 39 !important;
+}
+
+/* Improve editor performance */
+.monaco-editor .overflow-guard {
+  position: absolute !important;
+  width: 100% !important;
+  height: 100% !important;
+  overflow: auto !important;
+}
+
+.monaco-editor .monaco-scrollable-element {
+  position: absolute !important;
+  width: 100% !important;
+  height: 100% !important;
+}
+
+/* Ensure content is scrollable */
+.monaco-editor .view-lines {
+  overflow: visible !important;
+}
+
+.monaco-editor .view-line {
+  overflow: visible !important;
 }
 
 /* Custom Scrollbars */
@@ -153,4 +331,41 @@
 
 .javascript .code-editor::selection {
   background-color: #4b5563;
+}
+
+.editor-wrapper {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  position: relative;
+}
+
+/* Responsive styles */
+@media (max-width: 768px) {
+  .editor-header {
+    height: 26px;
+    min-height: 26px;
+  }
+  
+  .editor-title {
+    font-size: 11px;
+  }
+  
+  .monaco-editor {
+    -webkit-text-size-adjust: 100%;
+    touch-action: manipulation;
+  }
+}
+
+@media (max-width: 480px) {
+  .editor-header {
+    height: 24px;
+    min-height: 24px;
+  }
+  
+  .editor-title {
+    font-size: 10px;
+  }
 } 

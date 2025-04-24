@@ -14,21 +14,28 @@ const Signup = ({ setCurrentPage }) => {
     e.preventDefault();
     setError('');
     setLoading(true);
-
+    
     try {
-      if (!username || !email || !password) {
-        throw new Error('Please fill in all required fields');
+      // Validate username format
+      if (!/^[a-zA-Z0-9_]{3,20}$/.test(username)) {
+        throw new Error('Username must be 3-20 characters long and can only contain letters, numbers, and underscores');
       }
-
+      
+      // Validate email format
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        throw new Error('Please enter a valid email address');
+      }
+      
+      // Validate password strength
       if (password.length < 6) {
         throw new Error('Password must be at least 6 characters long');
       }
-
+      
       await signup(email, password, username, bio);
-      // Redirect or handle successful signup
-    } catch (error) {
-      console.error('Signup error:', error);
-      setError(error.message);
+      setCurrentPage('dashboard');
+    } catch (err) {
+      console.error('Signup error:', err);
+      setError(err.message || 'Failed to create an account');
     } finally {
       setLoading(false);
     }
@@ -40,7 +47,7 @@ const Signup = ({ setCurrentPage }) => {
 
     try {
       await signInWithGoogle();
-      // Redirect or handle successful signup
+      setCurrentPage('dashboard');
     } catch (error) {
       console.error('Google signup error:', error);
       setError(error.message);

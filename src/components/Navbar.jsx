@@ -33,14 +33,48 @@ const Navbar = ({ currentPage, setCurrentPage }) => {
     const fetchUserProfile = async () => {
       if (user) {
         try {
-          const users = await getDocuments('users', {
-            where: ['uid', '==', user.uid]
-          });
-          if (users.length > 0) {
-            setUserProfile(users[0]);
+          console.log('User auth data:', user);
+          
+          // Use the user's auth data directly instead of fetching from Firestore
+          const userProfileData = {
+            uid: user.uid,
+            displayName: user.displayName || 'User',
+            email: user.email,
+            photoURL: user.photoURL,
+            createdAt: new Date()
+          };
+          
+          console.log('Using auth data for profile:', userProfileData);
+          setUserProfile(userProfileData);
+          
+          // Try to fetch from Firestore as a backup, but don't rely on it
+          try {
+            const users = await getDocuments('users', {
+              where: ['uid', '==', user.uid]
+            });
+            if (users.length > 0) {
+              console.log('User profile also found in Firestore:', users[0]);
+              // Merge Firestore data with auth data, preferring auth data for critical fields
+              setUserProfile({
+                ...users[0],
+                displayName: user.displayName || users[0].displayName || 'User',
+                email: user.email || users[0].email,
+                photoURL: user.photoURL || users[0].photoURL
+              });
+            }
+          } catch (firestoreError) {
+            console.warn('Could not fetch from Firestore, using auth data only:', firestoreError);
           }
         } catch (error) {
-          console.error('Error fetching user profile:', error);
+          console.error('Error setting up user profile:', error);
+          // Set a default profile on error
+          const defaultProfile = {
+            uid: user.uid,
+            displayName: user.displayName || 'User',
+            email: user.email,
+            photoURL: user.photoURL
+          };
+          setUserProfile(defaultProfile);
         }
       }
     };
@@ -123,12 +157,41 @@ const Navbar = ({ currentPage, setCurrentPage }) => {
           {user ? (
             <div className="profile-container" ref={profileRef}>
               {userProfile?.photoURL ? (
-                <img
-                  src={userProfile.photoURL}
-                  alt="Profile"
-                  className="profile-picture"
+                <div 
+                  style={{ 
+                    width: '40px', 
+                    height: '40px', 
+                    borderRadius: '50%', 
+                    overflow: 'hidden', 
+                    border: '2px solid white',
+                    backgroundColor: 'white',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center'
+                  }}
                   onClick={() => setIsProfileOpen(!isProfileOpen)}
-                />
+                >
+                  <img
+                    src={userProfile.photoURL}
+                    alt="Profile"
+                    style={{ 
+                      width: '100%', 
+                      height: '100%', 
+                      objectFit: 'cover',
+                      display: 'block'
+                    }}
+                    onError={(e) => {
+                      console.error('Error loading profile image:', e);
+                      e.target.onerror = null;
+                      e.target.style.display = 'none';
+                      const initialsDiv = document.createElement('div');
+                      initialsDiv.className = 'profile-initials';
+                      initialsDiv.textContent = getInitials(getUserName());
+                      initialsDiv.onclick = () => setIsProfileOpen(!isProfileOpen);
+                      e.target.parentNode.appendChild(initialsDiv);
+                    }}
+                  />
+                </div>
               ) : (
                 <div
                   className="profile-initials"
@@ -142,11 +205,39 @@ const Navbar = ({ currentPage, setCurrentPage }) => {
                 <div className="profile-dropdown">
                   <div className="profile-header">
                     {userProfile?.photoURL ? (
-                      <img
-                        src={userProfile.photoURL}
-                        alt="Profile"
-                        className="profile-picture-large"
-                      />
+                      <div 
+                        style={{ 
+                          width: '60px', 
+                          height: '60px', 
+                          borderRadius: '50%', 
+                          overflow: 'hidden', 
+                          border: '2px solid white',
+                          backgroundColor: 'white',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center'
+                        }}
+                      >
+                        <img
+                          src={userProfile.photoURL}
+                          alt="Profile"
+                          style={{ 
+                            width: '100%', 
+                            height: '100%', 
+                            objectFit: 'cover',
+                            display: 'block'
+                          }}
+                          onError={(e) => {
+                            console.error('Error loading profile image in dropdown:', e);
+                            e.target.onerror = null;
+                            e.target.style.display = 'none';
+                            const initialsDiv = document.createElement('div');
+                            initialsDiv.className = 'profile-initials-large';
+                            initialsDiv.textContent = getInitials(getUserName());
+                            e.target.parentNode.appendChild(initialsDiv);
+                          }}
+                        />
+                      </div>
                     ) : (
                       <div className="profile-initials-large">
                         {getInitials(getUserName())}

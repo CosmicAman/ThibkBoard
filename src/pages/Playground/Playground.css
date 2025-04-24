@@ -130,16 +130,71 @@
   overflow: hidden;
 }
 
+/* New tab styles */
+.editor-tabs {
+  display: flex;
+  background-color: #252526;
+  border-bottom: 1px solid #333;
+  height: 40px;
+  min-height: 40px;
+}
+
+.tab-button {
+  background-color: #2d2d2d;
+  color: #cccccc;
+  border: none;
+  border-right: 1px solid #333;
+  padding: 0 16px;
+  font-size: 14px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.tab-button:hover {
+  background-color: #3c3c3c;
+}
+
+.tab-button.active {
+  background-color: #1e1e1e;
+  color: #ffffff;
+  border-bottom: 2px solid #007acc;
+}
+
 .editor-container {
   flex: 1;
   min-height: 0;
   overflow: hidden;
   position: relative;
-  border-bottom: 1px solid #333;
 }
 
-.editor-container:last-child {
-  border-bottom: none;
+/* Monaco Editor Responsive Fixes */
+.monaco-editor {
+  width: 100% !important;
+  height: 100% !important;
+  padding: 0 !important;
+}
+
+.monaco-editor .overflow-guard {
+  width: 100% !important;
+  height: 100% !important;
+}
+
+.monaco-editor .monaco-scrollable-element {
+  width: 100% !important;
+  height: 100% !important;
+}
+
+.monaco-editor .view-lines {
+  width: 100% !important;
+}
+
+.monaco-editor .view-line {
+  width: 100% !important;
+  overflow: visible !important;
 }
 
 .preview-section {
@@ -184,8 +239,10 @@
 .preview-iframe {
   flex: 1;
   width: 100%;
+  height: 100%;
   border: none;
   background-color: #fff;
+  overflow: auto;
 }
 
 /* Responsive Design */
@@ -220,11 +277,46 @@
   .preview-section {
     height: 30%;
   }
+  
+  .editor-tabs {
+    height: 36px;
+    min-height: 36px;
+  }
+  
+  .tab-button {
+    padding: 0 12px;
+    font-size: 13px;
+  }
 }
 
 @media (max-width: 480px) {
   .playground-header {
     padding: 8px;
+    flex-direction: row;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .playground-title {
+    width: 120px;
+    font-size: 12px;
+    padding: 6px 8px;
+  }
+
+  .playground-controls {
+    display: flex;
+    gap: 8px;
+  }
+
+  .save-button, .load-select {
+    padding: 6px 10px;
+    font-size: 12px;
+  }
+
+  .load-select {
+    min-width: 100px;
   }
 
   .editors-section {
@@ -233,6 +325,74 @@
 
   .preview-section {
     height: 25%;
+  }
+  
+  .editor-tabs {
+    height: 32px;
+    min-height: 32px;
+  }
+  
+  .tab-button {
+    padding: 0 8px;
+    font-size: 12px;
+  }
+}
+
+/* Small mobile devices (375px and below) */
+@media (max-width: 375px) {
+  .playground-page {
+    padding: 10px;
+  }
+  
+  .playground-header {
+    padding: 6px;
+    flex-direction: row;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    align-items: center;
+    gap: 6px;
+  }
+  
+  .playground-title {
+    width: 100px;
+    font-size: 11px;
+    padding: 5px 6px;
+  }
+  
+  .save-button, .load-select {
+    padding: 5px 8px;
+    font-size: 11px;
+  }
+  
+  .load-select {
+    min-width: 80px;
+  }
+  
+  .editors-section {
+    height: 80%;
+  }
+
+  .preview-section {
+    height: 20%;
+  }
+  
+  .editor-tabs {
+    height: 28px;
+    min-height: 28px;
+  }
+  
+  .tab-button {
+    padding: 0 6px;
+    font-size: 11px;
+  }
+  
+  .preview-header {
+    height: 24px;
+    min-height: 24px;
+  }
+  
+  .preview-header span {
+    font-size: 10px;
   }
 }
 
@@ -308,4 +468,17 @@
 .save-button:disabled:hover,
 .load-select:disabled:hover {
   background-color: inherit;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  font-family: Arial, sans-serif;
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
+}
+.container {
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
 } 

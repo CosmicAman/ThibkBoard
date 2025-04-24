@@ -142,11 +142,35 @@
   transform: translateZ(0);
   backface-visibility: hidden;
   will-change: transform;
+  cursor: pointer;
+  position: relative;
+  overflow: hidden;
 }
 
 .feature-card:hover {
   transform: translateY(-5px) translateZ(0);
   box-shadow: 0 8px 16px rgba(0, 0, 0, 0.1);
+}
+
+.feature-card::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(45deg, rgba(74, 108, 247, 0.1), rgba(74, 108, 247, 0));
+  opacity: 0;
+  transition: opacity 0.3s ease-out;
+}
+
+.feature-card:hover::after {
+  opacity: 1;
+}
+
+.feature-card:active {
+  transform: translateY(-2px) translateZ(0);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
 }
 
 .feature-icon {

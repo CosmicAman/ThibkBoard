@@ -5,15 +5,8 @@ import './Editor.css';
 const CodeEditor = ({ language, value, onChange, title }) => {
   const editorRef = useRef(null);
 
-  useEffect(() => {
-    if (editorRef.current) {
-      editorRef.current.setValue(value);
-    }
-  }, [value]);
-
   const handleEditorDidMount = (editor, monaco) => {
     editorRef.current = editor;
-    editor.focus();
     
     // Configure language-specific settings
     if (language === 'html') {
@@ -125,68 +118,30 @@ const CodeEditor = ({ language, value, onChange, title }) => {
   };
 
   return (
-    <div className="editor-container">
+    <div className="editor-wrapper">
       <div className="editor-header">
         <span className="editor-title">{title}</span>
       </div>
       <Editor
         height="100%"
-        defaultLanguage={language}
-        defaultValue={value}
+        language={language}
+        value={value}
         onChange={onChange}
         onMount={handleEditorDidMount}
         theme="vs-dark"
         options={{
+          // Basic editor settings
           minimap: { enabled: false },
           fontSize: 14,
           lineNumbers: 'on',
           roundedSelection: false,
-          scrollBeyondLastLine: false,
+          scrollBeyondLastLine: true,
           readOnly: false,
           automaticLayout: true,
           tabSize: 2,
           wordWrap: 'on',
-          formatOnPaste: true,
-          formatOnType: true,
-          suggestOnTriggerCharacters: true,
-          acceptSuggestionOnEnter: 'on',
-          tabCompletion: 'on',
-          wordBasedSuggestions: true,
-          parameterHints: { enabled: true },
-          quickSuggestions: {
-            other: true,
-            comments: true,
-            strings: true
-          },
-          suggest: {
-            preview: true,
-            showMethods: true,
-            showFunctions: true,
-            showConstructors: true,
-            showFields: true,
-            showVariables: true,
-            showClasses: true,
-            showStructs: true,
-            showInterfaces: true,
-            showModules: true,
-            showProperties: true,
-            showEvents: true,
-            showOperators: true,
-            showUnits: true,
-            showValues: true,
-            showConstants: true,
-            showEnums: true,
-            showEnumMembers: true,
-            showKeywords: true,
-            showWords: true,
-            showColors: true,
-            showFiles: true,
-            showReferences: true,
-            showFolders: true,
-            showTypeParameters: true,
-            showSnippets: true
-          },
-          // Additional editor features
+          
+          // Editor features
           autoClosingBrackets: 'always',
           autoClosingQuotes: 'always',
           autoIndent: 'full',
@@ -194,22 +149,19 @@ const CodeEditor = ({ language, value, onChange, title }) => {
           bracketPairColorization: { enabled: true },
           contextmenu: true,
           cursorBlinking: 'smooth',
-          cursorSmoothCaretAnimation: 'on',
           cursorStyle: 'line',
           folding: true,
           fontLigatures: true,
-          guides: {
-            bracketPairs: true,
-            indentation: true,
-            highlightActiveIndentation: true
-          },
-          hover: { enabled: true },
-          inlayHints: { enabled: true },
           links: true,
           matchBrackets: 'always',
           mouseWheelZoom: true,
           multiCursorModifier: 'alt',
-          renderWhitespace: 'selection',
+          
+          // Performance settings
+          renderControlCharacters: false,
+          renderIndentGuides: true,
+          
+          // Scrollbar settings
           scrollbar: {
             vertical: 'visible',
             horizontal: 'visible',
@@ -217,12 +169,9 @@ const CodeEditor = ({ language, value, onChange, title }) => {
             verticalHasArrows: false,
             horizontalHasArrows: false,
             verticalScrollbarSize: 10,
-            horizontalScrollbarSize: 10
-          },
-          selectOnLineNumbers: true,
-          smoothScrolling: true,
-          suggestSelection: 'first',
-          wordSeparators: '`~!@#$%^&*()=+[{]}\\|;:\'",.<>/?'
+            horizontalScrollbarSize: 10,
+            arrowSize: 30
+          }
         }}
       />
     </div>

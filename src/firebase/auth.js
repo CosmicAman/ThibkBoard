@@ -18,6 +18,25 @@ const googleProvider = new GoogleAuthProvider();
 // Sign up new user with email/password
 export const signup = async (email, password, username, bio) => {
   try {
+    // Check if a user with the same email already exists
+    const existingUsersByEmail = await getDocuments('users', [
+      { field: 'email', operator: '==', value: email }
+    ]);
+    
+    if (existingUsersByEmail.length > 0) {
+      throw new Error('An account with this email already exists');
+    }
+    
+    // Check if a user with the same username already exists
+    const existingUsersByUsername = await getDocuments('users', [
+      { field: 'username', operator: '==', value: username }
+    ]);
+    
+    if (existingUsersByUsername.length > 0) {
+      throw new Error('This username is already taken');
+    }
+    
+    // If no existing users found, proceed with account creation
     const userCredential = await createUserWithEmailAndPassword(auth, email, password);
     const user = userCredential.user;
     

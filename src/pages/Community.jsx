@@ -232,6 +232,37 @@ const Community = () => {
     }).format(date);
   };
 
+  const handleFormatText = (command) => {
+    if (command === 'bold') {
+      document.execCommand('bold', false, null);
+    } else if (command === 'italic') {
+      document.execCommand('italic', false, null);
+    } else if (command === 'underline') {
+      document.execCommand('underline', false, null);
+    } else if (command === 'alignLeft') {
+      document.execCommand('justifyLeft', false, null);
+    } else if (command === 'alignCenter') {
+      document.execCommand('justifyCenter', false, null);
+    } else if (command === 'alignRight') {
+      document.execCommand('justifyRight', false, null);
+    } else if (command === 'link') {
+      const url = prompt('Enter the URL:');
+      if (url) {
+        document.execCommand('createLink', false, url);
+      }
+    }
+  };
+
+  const processContent = (content) => {
+    // Regular expression to match URLs
+    const urlRegex = /(https?:\/\/[^\s]+)/g;
+    
+    // Replace URLs with clickable links
+    return content.replace(urlRegex, (url) => {
+      return `<a href="${url}" target="_blank" rel="noopener noreferrer" class="post-link">${url}</a>`;
+    });
+  };
+
   if (!user) {
     return (
       <div className="community-container">
@@ -333,7 +364,12 @@ const Community = () => {
                     </div>
                   ) : (
                     <>
-                      <p>{post.content}</p>
+                      <div 
+                        className="post-text-content" 
+                        dangerouslySetInnerHTML={{ 
+                          __html: processContent(post.content) 
+                        }}
+                      ></div>
                       {post.image && (
                         <img src={post.image} alt="Post content" className="post-image" />
                       )}
@@ -362,7 +398,7 @@ const Community = () => {
                     💬 {post.commentCount || 0}
                   </button>
                 </div>
-
+                
                 {/* Comments Section */}
                 {expandedPostId === post.id && (
                   <div className="comments-section">
@@ -516,6 +552,17 @@ const Community = () => {
           )}
         </form>
       </div>
+
+      {/* Formatting Toolbar
+      <div className="formatting-toolbar">
+        <button onClick={() => handleFormatText('bold')}>B</button>
+        <button onClick={() => handleFormatText('italic')}>I</button>
+        <button onClick={() => handleFormatText('underline')}>U</button>
+        <button onClick={() => handleFormatText('alignLeft')}>Left</button>
+        <button onClick={() => handleFormatText('alignCenter')}>Center</button>
+        <button onClick={() => handleFormatText('alignRight')}>Right</button>
+        <button onClick={() => handleFormatText('link')}>Link</button>
+      </div> */}
     </div>
   );
 };

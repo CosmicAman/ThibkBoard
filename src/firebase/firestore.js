@@ -49,12 +49,35 @@ export const getDocument = async (collectionName, docId) => {
 // Get all documents in a collection
 export const getDocuments = async (collectionName, filters = []) => {
   try {
-    let q = getCollectionRef(collectionName);
-    filters.forEach(({ field, operator, value }) => {
-      q = query(q, where(field, operator, value));
-    });
-    const querySnapshot = await getDocs(q);
-    return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    const collectionRef = collection(db, collectionName);
+    let queryRef = collectionRef;
+    
+    // Handle both array and object filter formats
+    if (Array.isArray(filters)) {
+      const queryConstraints = filters.map(filter => {
+        if (filter.length === 3) {
+          const [field, operator, value] = filter;
+          return where(field, operator, value);
+        }
+        return null;
+      }).filter(Boolean);
+      
+      if (queryConstraints.length > 0) {
+        queryRef = query(collectionRef, ...queryConstraints);
+      }
+    } else if (filters && typeof filters === 'object') {
+      // Handle object format with 'where' property
+      if (filters.where && Array.isArray(filters.where)) {
+        const [field, operator, value] = filters.where;
+        queryRef = query(collectionRef, where(field, operator, value));
+      }
+    }
+
+    const querySnapshot = await getDocs(queryRef);
+    return querySnapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data()
+    }));
   } catch (error) {
     console.error('Error getting documents:', error);
     throw error;

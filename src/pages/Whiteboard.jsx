@@ -485,6 +485,57 @@ const Whiteboard = () => {
     }
   };
 
+  useEffect(() => {
+    const fetchWhiteboards = async () => {
+      if (user) {
+        try {
+          setLoading(true);
+          const userWhiteboards = await getDocuments('whiteboards', [
+            ['userId', '==', user.uid]
+          ]);
+          setWhiteboards(userWhiteboards);
+          setLoading(false);
+        } catch (error) {
+          console.error('Failed to load whiteboards:', error);
+          setLoading(false);
+          
+          // Show a user-friendly error message
+          if (error.message && error.message.includes('Missing or insufficient permissions')) {
+            // This is likely a permissions issue - create a default whiteboard for the user
+            try {
+              console.log('Creating default whiteboard for user');
+              const defaultWhiteboard = {
+                title: 'My First Whiteboard',
+                content: '',
+                userId: user.uid,
+                createdAt: new Date(),
+                updatedAt: new Date()
+              };
+              
+              const newWhiteboardRef = await addDocument('whiteboards', defaultWhiteboard);
+              const newWhiteboard = {
+                id: newWhiteboardRef.id,
+                ...defaultWhiteboard
+              };
+              
+              setWhiteboards([newWhiteboard]);
+              setSelectedWhiteboard(newWhiteboard);
+              setShowWhiteboardModal(false);
+            } catch (createError) {
+              console.error('Failed to create default whiteboard:', createError);
+              // Show a more specific error message
+              setError('Unable to access or create whiteboards. Please check your permissions or try again later.');
+            }
+          } else {
+            setError('Failed to load whiteboards. Please try again later.');
+          }
+        }
+      }
+    };
+
+    fetchWhiteboards();
+  }, [user]);
+
   if (contextLoading) {
     console.log('Showing loading state due to context loading');
     return (

@@ -2,12 +2,40 @@ import { useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import './Home.css';
 
-const Home = () => {
+const Home = ({ setCurrentPage }) => {
   const { user } = useAuth();
   
   useEffect(() => {
     document.title = 'ThinkBoard - Your Learning Companion';
   }, []);
+
+  const handleGetStarted = () => {
+    if (!user) {
+      setCurrentPage('signup');
+    } else {
+      setCurrentPage('notes');
+    }
+  };
+
+  const handleLearnMore = () => {
+    // Scroll to features section
+    const featuresSection = document.querySelector('.features-section');
+    if (featuresSection) {
+      featuresSection.scrollIntoView({ behavior: 'smooth' });
+    }
+  };
+
+  const handleExploreDashboard = () => {
+    setCurrentPage('notes');
+  };
+
+  const handleFeatureClick = (page) => {
+    if (!user) {
+      setCurrentPage('signup');
+    } else {
+      setCurrentPage(page);
+    }
+  };
 
   return (
     <div className="home-container">
@@ -17,8 +45,8 @@ const Home = () => {
           <p className="hero-subtitle">Your all-in-one learning and productivity platform</p>
           {!user && (
             <div className="cta-buttons">
-              <button className="primary-btn">Get Started</button>
-              <button className="secondary-btn">Learn More</button>
+              <button className="primary-btn" onClick={handleGetStarted}>Get Started</button>
+              <button className="secondary-btn" onClick={handleLearnMore}>Learn More</button>
             </div>
           )}
         </div>
@@ -27,37 +55,37 @@ const Home = () => {
       <section className="features-section">
         <h2>Powerful Tools for Learning and Collaboration</h2>
         <div className="features-grid">
-          <div className="feature-card">
+          <div className="feature-card" onClick={() => handleFeatureClick('notes')}>
             <div className="feature-icon">📝</div>
             <h3>Smart Notes</h3>
             <p>Organize your thoughts with our powerful note-taking system. Tag, search, and categorize your notes effortlessly.</p>
           </div>
           
-          <div className="feature-card">
+          <div className="feature-card" onClick={() => handleFeatureClick('quizzes')}>
             <div className="feature-icon">🧠</div>
             <h3>Interactive Quizzes</h3>
             <p>Test your knowledge and reinforce learning with customizable quizzes and flashcards.</p>
           </div>
           
-          <div className="feature-card">
+          <div className="feature-card" onClick={() => handleFeatureClick('whiteboard')}>
             <div className="feature-icon">🖌️</div>
             <h3>Digital Whiteboard</h3>
             <p>Visualize concepts and brainstorm ideas with our intuitive whiteboard tool.</p>
           </div>
           
-          <div className="feature-card">
+          <div className="feature-card" onClick={() => handleFeatureClick('community')}>
             <div className="feature-icon">👥</div>
             <h3>Community</h3>
             <p>Connect with other learners, share resources, and collaborate on projects.</p>
           </div>
           
-          <div className="feature-card">
+          <div className="feature-card" onClick={() => handleFeatureClick('playground')}>
             <div className="feature-icon">💻</div>
             <h3>Code Playground</h3>
             <p>Practice coding with our interactive playground supporting multiple programming languages.</p>
           </div>
           
-          <div className="feature-card">
+          <div className="feature-card" onClick={() => handleFeatureClick('chat')}>
             <div className="feature-icon">💬</div>
             <h3>AI Chat Assistant</h3>
             <p>Get help and answers to your questions with our intelligent chat assistant.</p>
@@ -143,9 +171,9 @@ const Home = () => {
         <h2>Ready to Enhance Your Learning Experience?</h2>
         <p>Join thousands of students, educators, and professionals who use ThinkBoard every day.</p>
         {!user ? (
-          <button className="primary-btn large">Get Started for Free</button>
+          <button className="primary-btn large" onClick={handleGetStarted}>Get Started for Free</button>
         ) : (
-          <button className="primary-btn large">Explore Your Dashboard</button>
+          <button className="primary-btn large" onClick={handleExploreDashboard}>Explore Your Dashboard</button>
         )}
       </section>
     </div>

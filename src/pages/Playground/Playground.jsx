@@ -12,6 +12,7 @@ const Playground = () => {
   const [js, setJs] = useState('// Add your JavaScript here\nconsole.log("Hello from JavaScript!");\ndocument.querySelector("h1").addEventListener("click", () => {\n  alert("Hello from JavaScript!");\n});');
   const [fileName, setFileName] = useState('Untitled Playground');
   const [error, setError] = useState('');
+  const [activeTab, setActiveTab] = useState('html'); // Track active editor tab
   const iframeRef = useRef(null);
 
   useEffect(() => {
@@ -125,6 +126,41 @@ const Playground = () => {
     }
   };
 
+  // Render the active editor based on the selected tab
+  const renderActiveEditor = () => {
+    switch (activeTab) {
+      case 'html':
+        return (
+          <CodeEditor
+            language="html"
+            value={html}
+            onChange={setHtml}
+            title="HTML"
+          />
+        );
+      case 'css':
+        return (
+          <CodeEditor
+            language="css"
+            value={css}
+            onChange={setCss}
+            title="CSS"
+          />
+        );
+      case 'js':
+        return (
+          <CodeEditor
+            language="javascript"
+            value={js}
+            onChange={setJs}
+            title="JavaScript"
+          />
+        );
+      default:
+        return null;
+    }
+  };
+
   return (
     <div className="playground-container">
       <div className="playground-header">
@@ -167,29 +203,28 @@ const Playground = () => {
       )}
       <div className="main-content">
         <div className="editors-section">
-          <div className="editor-container">
-            <CodeEditor
-              language="html"
-              value={html}
-              onChange={setHtml}
-              title="HTML"
-            />
+          <div className="editor-tabs">
+            <button 
+              className={`tab-button ${activeTab === 'html' ? 'active' : ''}`}
+              onClick={() => setActiveTab('html')}
+            >
+              HTML
+            </button>
+            <button 
+              className={`tab-button ${activeTab === 'css' ? 'active' : ''}`}
+              onClick={() => setActiveTab('css')}
+            >
+              CSS
+            </button>
+            <button 
+              className={`tab-button ${activeTab === 'js' ? 'active' : ''}`}
+              onClick={() => setActiveTab('js')}
+            >
+              JavaScript
+            </button>
           </div>
           <div className="editor-container">
-            <CodeEditor
-              language="css"
-              value={css}
-              onChange={setCss}
-              title="CSS"
-            />
-          </div>
-          <div className="editor-container">
-            <CodeEditor
-              language="javascript"
-              value={js}
-              onChange={setJs}
-              title="JavaScript"
-            />
+            {renderActiveEditor()}
           </div>
         </div>
         <div className="preview-section">
