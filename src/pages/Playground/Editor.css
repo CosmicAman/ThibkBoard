@@ -1,0 +1,156 @@
+/* Editor Container */
+.editor-container {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  width: 100%;
+  background-color: #1e1e1e;
+  border-radius: 4px;
+  overflow: hidden;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+/* Editor Header */
+.editor-header {
+  display: flex;
+  align-items: center;
+  padding: 8px 12px;
+  background-color: #252526;
+  border-bottom: 1px solid #333;
+}
+
+.editor-title {
+  color: #cccccc;
+  font-size: 12px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* Responsive styles */
+@media (max-width: 1200px) {
+  .editor-container {
+    height: 300px;
+  }
+}
+
+@media (max-width: 768px) {
+  .editor-container {
+    height: 250px;
+  }
+  
+  .editor-header {
+    padding: 6px 10px;
+  }
+  
+  .editor-title {
+    font-size: 11px;
+  }
+}
+
+@media (max-width: 480px) {
+  .editor-container {
+    height: 200px;
+  }
+  
+  .editor-header {
+    padding: 4px 8px;
+  }
+  
+  .editor-title {
+    font-size: 10px;
+  }
+}
+
+/* Dark mode styles */
+@media (prefers-color-scheme: dark) {
+  .editor-container {
+    background-color: #1e1e1e;
+  }
+  
+  .editor-header {
+    background-color: #252526;
+  }
+  
+  .editor-title {
+    color: #cccccc;
+  }
+}
+
+/* Light mode styles */
+@media (prefers-color-scheme: light) {
+  .editor-container {
+    background-color: #ffffff;
+  }
+  
+  .editor-header {
+    background-color: #f3f3f3;
+  }
+  
+  .editor-title {
+    color: #333333;
+  }
+}
+
+/* Monaco Editor Styling */
+.monaco-editor {
+  padding: 8px;
+}
+
+.monaco-editor .margin {
+  background-color: #1e1e1e !important;
+}
+
+.monaco-editor .monaco-editor-background {
+  background-color: #1e1e1e !important;
+}
+
+.monaco-editor .scroll-decoration {
+  box-shadow: none !important;
+}
+
+/* Custom Scrollbars */
+.editor-container ::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.editor-container ::-webkit-scrollbar-track {
+  background: #1e1e1e;
+}
+
+.editor-container ::-webkit-scrollbar-thumb {
+  background: #333;
+  border-radius: 4px;
+}
+
+.editor-container ::-webkit-scrollbar-thumb:hover {
+  background: #444;
+}
+
+/* Syntax highlighting for HTML */
+.html .code-editor {
+  color: #e5e7eb;
+}
+
+.html .code-editor::selection {
+  background-color: #4b5563;
+}
+
+/* Syntax highlighting for CSS */
+.css .code-editor {
+  color: #e5e7eb;
+}
+
+.css .code-editor::selection {
+  background-color: #4b5563;
+}
+
+/* Syntax highlighting for JavaScript */
+.javascript .code-editor {
+  color: #e5e7eb;
+}
+
+.javascript .code-editor::selection {
+  background-color: #4b5563;
+} 
