@@ -70,6 +70,8 @@ const Signup = ({ setCurrentPage }) => {
               onChange={(e) => setUsername(e.target.value)}
               required
               disabled={loading}
+              placeholder="Choose a username"
+              aria-label="Username"
             />
           </div>
           
@@ -82,6 +84,8 @@ const Signup = ({ setCurrentPage }) => {
               onChange={(e) => setEmail(e.target.value)}
               required
               disabled={loading}
+              placeholder="Enter your email"
+              aria-label="Email"
             />
           </div>
           
@@ -94,6 +98,8 @@ const Signup = ({ setCurrentPage }) => {
               onChange={(e) => setPassword(e.target.value)}
               required
               disabled={loading}
+              placeholder="Create a password (min 6 characters)"
+              aria-label="Password"
             />
           </div>
           
@@ -101,6 +107,7 @@ const Signup = ({ setCurrentPage }) => {
             type="submit" 
             className="auth-button"
             disabled={loading}
+            aria-label="Sign up button"
           >
             {loading ? 'Signing up...' : 'Sign Up'}
           </button>
@@ -114,8 +121,9 @@ const Signup = ({ setCurrentPage }) => {
           onClick={handleGoogleSignUp} 
           className="google-btn"
           disabled={loading}
+          aria-label="Continue with Google"
         >
-          <svg className="google-icon" viewBox="0 0 24 24" width="18" height="18" xmlns="http://www.w3.org/2000/svg">
+          <svg className="google-icon" viewBox="0 0 24 24" width="18" height="18" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
             <g transform="matrix(1, 0, 0, 1, 27.009001, -39.238998)">
               <path fill="#4285F4" d="M -3.264 51.509 C -3.264 50.719 -3.334 49.969 -3.454 49.239 L -14.754 49.239 L -14.754 53.749 L -8.284 53.749 C -8.574 55.229 -9.424 56.479 -10.684 57.329 L -10.684 60.329 L -6.824 60.329 C -4.564 58.239 -3.264 55.159 -3.264 51.509 Z"/>
               <path fill="#34A853" d="M -14.754 63.239 C -11.514 63.239 -8.804 62.159 -6.824 60.329 L -10.684 57.329 C -11.764 58.049 -13.134 58.489 -14.754 58.489 C -17.884 58.489 -20.534 56.379 -21.484 53.529 L -25.464 53.529 L -25.464 56.619 C -23.494 60.539 -19.444 63.239 -14.754 63.239 Z"/>
@@ -132,27 +140,11 @@ const Signup = ({ setCurrentPage }) => {
             className="auth-link-button" 
             onClick={handleLoginClick}
             disabled={loading}
+            aria-label="Login link"
           >
             Login
           </button>
         </p>
-      </div>
-      <div className="app-info-card">
-        <div className="info-card-header">
-          <h3>Welcome to ThinkBoard</h3>
-        </div>
-        <div className="info-card-content">
-          <p>ThinkBoard is a collaborative platform for organizing your thoughts, projects, and ideas.</p>
-          <ul>
-            <li>Create interactive mind maps</li>
-            <li>Collaborate with team members in real-time</li>
-            <li>Organize projects with customizable boards</li>
-            <li>Access your work from anywhere</li>
-          </ul>
-        </div>
-        <div className="info-card-footer">
-          <p>Sign up today to start your journey with ThinkBoard!</p>
-        </div>
       </div>
     </div>
     
