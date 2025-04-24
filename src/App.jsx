@@ -22,18 +22,28 @@ function App() {
   const [authPage, setAuthPage] = useState('login');
   const { user, loading } = useAuth();
 
-  console.log('App rendering with user:', user, 'loading:', loading);
-
   useEffect(() => {
-    console.log('App useEffect - user:', user, 'loading:', loading);
-    if (!loading && !user && window.location.pathname === '/') {
-      console.log('Redirecting to auth page');
-      window.location.href = '/auth';
-    }
-  }, [user, loading]);
+    // Handle initial page load and auth state
+    const handleInitialLoad = () => {
+      if (!loading) {
+        if (!user) {
+          // If not logged in, only allow home, login, or signup pages
+          if (!['home', 'login', 'signup'].includes(currentPage)) {
+            setCurrentPage('home');
+          }
+        } else {
+          // If logged in, ensure we're not on auth pages
+          if (['login', 'signup'].includes(currentPage)) {
+            setCurrentPage('home');
+          }
+        }
+      }
+    };
+
+    handleInitialLoad();
+  }, [user, loading, currentPage]);
 
   const renderPage = () => {
-    console.log('Rendering page:', currentPage);
     switch (currentPage) {
       case 'home':
         return <Home setCurrentPage={setCurrentPage} />;
@@ -58,41 +68,21 @@ function App() {
     }
   };
 
-  if (loading) {
-    console.log('Showing loading state');
-    return <div className="loading">Loading...</div>;
-  }
-
-  console.log('Rendering main app with user:', user);
-
   return (
-    <WhiteboardProvider>
-      <NotesProvider>
-        <PlaygroundProvider>
-          <CommunityProvider>
-            <div className="app">
-              {user && (
-                <>
-                  <Navbar currentPage={currentPage} setCurrentPage={setCurrentPage} />
-                  <main className="main-content">
-                    {renderPage()}
-                  </main>
-                </>
-              )}
-              {!user && (
-                <div className="auth-container">
-                  {authPage === 'login' ? (
-                    <Login setCurrentPage={setAuthPage} />
-                  ) : (
-                    <Signup setCurrentPage={setAuthPage} />
-                  )}
-                </div>
-              )}
-            </div>
-          </CommunityProvider>
-        </PlaygroundProvider>
-      </NotesProvider>
-    </WhiteboardProvider>
+    <div className="app">
+      <Navbar currentPage={currentPage} setCurrentPage={setCurrentPage} />
+      <main className="main-content">
+        <NotesProvider>
+          <WhiteboardProvider>
+            <PlaygroundProvider>
+              <CommunityProvider>
+                {renderPage()}
+              </CommunityProvider>
+            </PlaygroundProvider>
+          </WhiteboardProvider>
+        </NotesProvider>
+      </main>
+    </div>
   );
 }
 
