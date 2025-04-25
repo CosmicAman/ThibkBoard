@@ -30,7 +30,8 @@ const Whiteboard = () => {
     loadWhiteboard, 
     currentWhiteboard, 
     isLoading: contextLoading,
-    error: contextError 
+    error: contextError,
+    whiteboards
   } = useWhiteboard();
   
   console.log('Whiteboard context state:', {
@@ -52,6 +53,10 @@ const Whiteboard = () => {
   const [isSaving, setIsSaving] = useState(false);
   const [isInitialized, setIsInitialized] = useState(false);
   const [autoSaveTimer, setAutoSaveTimer] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [selectedWhiteboard, setSelectedWhiteboard] = useState(null);
+  const [showWhiteboardModal, setShowWhiteboardModal] = useState(false);
+  const [localWhiteboards, setLocalWhiteboards] = useState([]);
 
   // Move resizeCanvas to component scope
   const resizeCanvas = useCallback(() => {
@@ -490,10 +495,8 @@ const Whiteboard = () => {
       if (user) {
         try {
           setLoading(true);
-          const userWhiteboards = await getDocuments('whiteboards', [
-            ['userId', '==', user.uid]
-          ]);
-          setWhiteboards(userWhiteboards);
+          // Use the context's whiteboards
+          setLocalWhiteboards(whiteboards || []);
           setLoading(false);
         } catch (error) {
           console.error('Failed to load whiteboards:', error);
@@ -512,13 +515,14 @@ const Whiteboard = () => {
                 updatedAt: new Date()
               };
               
-              const newWhiteboardRef = await addDocument('whiteboards', defaultWhiteboard);
+              // Use the context function instead of direct Firestore call
+              const newWhiteboardId = await saveWhiteboard(user.uid, defaultWhiteboard);
               const newWhiteboard = {
-                id: newWhiteboardRef.id,
+                id: newWhiteboardId,
                 ...defaultWhiteboard
               };
               
-              setWhiteboards([newWhiteboard]);
+              setLocalWhiteboards([newWhiteboard]);
               setSelectedWhiteboard(newWhiteboard);
               setShowWhiteboardModal(false);
             } catch (createError) {
@@ -534,7 +538,7 @@ const Whiteboard = () => {
     };
 
     fetchWhiteboards();
-  }, [user]);
+  }, [user, whiteboards, saveWhiteboard]);
 
   if (contextLoading) {
     console.log('Showing loading state due to context loading');

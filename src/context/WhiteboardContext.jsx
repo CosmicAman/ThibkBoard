@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useEffect } from 'react';
-import { addDocument, getDocument, updateDocument, getDocuments } from '../firebase/firestore';
+import { addDocument, getDocument, updateDocument, getDocuments, deleteDocument } from '../firebase/firestore';
 import { useAuth } from './AuthContext';
 
 export const WHITEBOARD_TOOLS = {
@@ -30,69 +30,56 @@ export const WhiteboardProvider = ({ children }) => {
   useEffect(() => {
     console.log('WhiteboardProvider effect running');
     
-    const loadUserWhiteboards = async () => {
-      if (!user) {
-        console.log('No user found, resetting state');
-        setWhiteboards([]);
-        setCurrentWhiteboard(null);
-        setIsLoading(false);
-        return;
-      }
-
+    const loadUserWhiteboards = async (userId) => {
       try {
-        console.log('Loading whiteboards for user:', user.uid);
         setIsLoading(true);
         setError(null);
-
-        const userWhiteboards = await getDocuments('whiteboards', [
-          { field: 'userId', operator: '==', value: user.uid }
-        ]);
-
-        console.log('Loaded whiteboards:', userWhiteboards);
-        setWhiteboards(userWhiteboards);
         
-        if (userWhiteboards.length > 0) {
-          const mostRecent = userWhiteboards.reduce((prev, current) => 
-            new Date(prev.updatedAt) > new Date(current.updatedAt) ? prev : current
-          );
-          console.log('Setting current whiteboard:', mostRecent);
-          setCurrentWhiteboard(mostRecent);
-        } else {
-          console.log('No whiteboards found, creating new one');
+        const userWhiteboards = await getDocuments('whiteboards', [
+          ['userId', '==', userId]
+        ]);
+        
+        if (userWhiteboards.length === 0) {
+          // Create a new whiteboard if user has none
           const newWhiteboard = {
-            title: 'My Whiteboard',
+            userId,
+            title: 'My First Whiteboard',
             content: '',
-            userId: user.uid,
             createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString()
           };
           
-          try {
-            const docRef = await addDocument('whiteboards', newWhiteboard);
-            console.log('Created new whiteboard with ID:', docRef.id);
-            
-            const savedWhiteboard = {
-              id: docRef.id,
-              ...newWhiteboard
-            };
-            
-            setCurrentWhiteboard(savedWhiteboard);
-            setWhiteboards([savedWhiteboard]);
-          } catch (createError) {
-            console.error('Error creating new whiteboard:', createError);
-            setError('Failed to create new whiteboard: ' + createError.message);
-          }
+          const newWhiteboardId = await addDocument('whiteboards', newWhiteboard);
+          const createdWhiteboard = {
+            id: newWhiteboardId,
+            ...newWhiteboard
+          };
+          
+          setWhiteboards([createdWhiteboard]);
+          setCurrentWhiteboard(createdWhiteboard);
+        } else {
+          setWhiteboards(userWhiteboards);
+          setCurrentWhiteboard(userWhiteboards[0]);
         }
       } catch (error) {
         console.error('Error loading whiteboards:', error);
         setError('Failed to load whiteboards: ' + error.message);
+        setWhiteboards([]);
+        setCurrentWhiteboard(null);
       } finally {
-        console.log('Setting isLoading to false');
         setIsLoading(false);
       }
     };
 
-    loadUserWhiteboards();
+    // Only load whiteboards if user is authenticated
+    if (user) {
+      loadUserWhiteboards(user.uid);
+    } else {
+      // Reset state when user is not authenticated
+      setWhiteboards([]);
+      setCurrentWhiteboard(null);
+      setIsLoading(false);
+    }
   }, [user]);
 
   const saveWhiteboard = async (userId, whiteboardData) => {
@@ -100,6 +87,11 @@ export const WhiteboardProvider = ({ children }) => {
       console.log('Saving whiteboard:', whiteboardData);
       setIsLoading(true);
       setError(null);
+
+      // Check if user is authenticated
+      if (!user) {
+        throw new Error('User must be authenticated to save whiteboards');
+      }
 
       const whiteboardWithUser = {
         ...whiteboardData,
@@ -138,6 +130,11 @@ export const WhiteboardProvider = ({ children }) => {
       setIsLoading(true);
       setError(null);
 
+      // Check if user is authenticated
+      if (!user) {
+        throw new Error('User must be authenticated to load whiteboards');
+      }
+
       const whiteboard = await getDocument('whiteboards', whiteboardId);
       
       if (!whiteboard) {
@@ -159,22 +156,73 @@ export const WhiteboardProvider = ({ children }) => {
     try {
       setIsLoading(true);
       setError(null);
-
-      await updateDocument('whiteboards', whiteboardId, updates);
       
-      const updatedWhiteboard = {
-        ...currentWhiteboard,
-        ...updates
-      };
-
-      setCurrentWhiteboard(updatedWhiteboard);
-      setWhiteboards(prev => 
-        prev.map(wb => wb.id === whiteboardId ? updatedWhiteboard : wb)
+      // Check if user is authenticated
+      if (!user) {
+        throw new Error('User must be authenticated to update whiteboards');
+      }
+      
+      // Update the whiteboard in Firestore
+      await updateDocument('whiteboards', whiteboardId, {
+        ...updates,
+        updatedAt: new Date().toISOString()
+      });
+      
+      // Update the local state
+      setWhiteboards(prevWhiteboards => 
+        prevWhiteboards.map(wb => 
+          wb.id === whiteboardId 
+            ? { ...wb, ...updates, updatedAt: new Date().toISOString() }
+            : wb
+        )
       );
+      
+      // Update current whiteboard if it's the one being edited
+      if (currentWhiteboard?.id === whiteboardId) {
+        setCurrentWhiteboard(prev => ({
+          ...prev,
+          ...updates,
+          updatedAt: new Date().toISOString()
+        }));
+      }
     } catch (error) {
       console.error('Error updating whiteboard:', error);
       setError('Failed to update whiteboard: ' + error.message);
-      throw error;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const deleteWhiteboard = async (whiteboardId) => {
+    try {
+      setIsLoading(true);
+      setError(null);
+      
+      // Check if user is authenticated
+      if (!user) {
+        throw new Error('User must be authenticated to delete whiteboards');
+      }
+      
+      // Delete the whiteboard from Firestore
+      await deleteDocument('whiteboards', whiteboardId);
+      
+      // Update the local state
+      setWhiteboards(prevWhiteboards => 
+        prevWhiteboards.filter(wb => wb.id !== whiteboardId)
+      );
+      
+      // If the deleted whiteboard was the current one, set a new current whiteboard
+      if (currentWhiteboard?.id === whiteboardId) {
+        const remainingWhiteboards = whiteboards.filter(wb => wb.id !== whiteboardId);
+        if (remainingWhiteboards.length > 0) {
+          setCurrentWhiteboard(remainingWhiteboards[0]);
+        } else {
+          setCurrentWhiteboard(null);
+        }
+      }
+    } catch (error) {
+      console.error('Error deleting whiteboard:', error);
+      setError('Failed to delete whiteboard: ' + error.message);
     } finally {
       setIsLoading(false);
     }
@@ -187,7 +235,8 @@ export const WhiteboardProvider = ({ children }) => {
     error,
     saveWhiteboard,
     loadWhiteboard,
-    updateWhiteboard
+    updateWhiteboard,
+    deleteWhiteboard
   };
 
   console.log('WhiteboardProvider value:', value);

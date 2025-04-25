@@ -35,7 +35,7 @@ const Navbar = ({ currentPage, setCurrentPage }) => {
         try {
           console.log('User auth data:', user);
           
-          // Use the user's auth data directly instead of fetching from Firestore
+          // Use the user's auth data directly
           const userProfileData = {
             uid: user.uid,
             displayName: user.displayName || 'User',
@@ -47,14 +47,13 @@ const Navbar = ({ currentPage, setCurrentPage }) => {
           console.log('Using auth data for profile:', userProfileData);
           setUserProfile(userProfileData);
           
-          // Try to fetch from Firestore as a backup, but don't rely on it
+          // Try to fetch from Firestore as a backup
           try {
             const users = await getDocuments('users', {
               where: ['uid', '==', user.uid]
             });
             if (users.length > 0) {
-              console.log('User profile also found in Firestore:', users[0]);
-              // Merge Firestore data with auth data, preferring auth data for critical fields
+              console.log('User profile found in Firestore:', users[0]);
               setUserProfile({
                 ...users[0],
                 displayName: user.displayName || users[0].displayName || 'User',
@@ -63,18 +62,16 @@ const Navbar = ({ currentPage, setCurrentPage }) => {
               });
             }
           } catch (firestoreError) {
-            console.warn('Could not fetch from Firestore, using auth data only:', firestoreError);
+            console.warn('Could not fetch from Firestore:', firestoreError);
           }
         } catch (error) {
           console.error('Error setting up user profile:', error);
-          // Set a default profile on error
-          const defaultProfile = {
+          setUserProfile({
             uid: user.uid,
             displayName: user.displayName || 'User',
             email: user.email,
             photoURL: user.photoURL
-          };
-          setUserProfile(defaultProfile);
+          });
         }
       }
     };
@@ -156,96 +153,56 @@ const Navbar = ({ currentPage, setCurrentPage }) => {
         <div className="navbar-right">
           {user ? (
             <div className="profile-container" ref={profileRef}>
-              {userProfile?.photoURL ? (
-                <div 
-                  style={{ 
-                    width: '40px', 
-                    height: '40px', 
-                    borderRadius: '50%', 
-                    overflow: 'hidden', 
-                    border: '2px solid white',
-                    backgroundColor: 'white',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center'
-                  }}
-                  onClick={() => setIsProfileOpen(!isProfileOpen)}
-                >
+              <div 
+                className="profile-picture-container"
+                onClick={() => setIsProfileOpen(!isProfileOpen)}
+              >
+                {userProfile?.photoURL ? (
                   <img
                     src={userProfile.photoURL}
-                    alt="Profile"
-                    style={{ 
-                      width: '100%', 
-                      height: '100%', 
-                      objectFit: 'cover',
-                      display: 'block'
-                    }}
+                    alt={userProfile.displayName}
+                    className="profile-picture"
                     onError={(e) => {
-                      console.error('Error loading profile image:', e);
-                      e.target.onerror = null;
+                      console.error('Error loading profile picture:', e);
                       e.target.style.display = 'none';
-                      const initialsDiv = document.createElement('div');
-                      initialsDiv.className = 'profile-initials';
-                      initialsDiv.textContent = getInitials(getUserName());
-                      initialsDiv.onclick = () => setIsProfileOpen(!isProfileOpen);
-                      e.target.parentNode.appendChild(initialsDiv);
+                      e.target.nextSibling.style.display = 'flex';
                     }}
                   />
-                </div>
-              ) : (
-                <div
+                ) : null}
+                <div 
                   className="profile-initials"
-                  onClick={() => setIsProfileOpen(!isProfileOpen)}
+                  style={{ display: userProfile?.photoURL ? 'none' : 'flex' }}
                 >
-                  {getInitials(getUserName())}
+                  {getInitials(userProfile?.displayName)}
                 </div>
-              )}
+              </div>
               
               {isProfileOpen && (
                 <div className="profile-dropdown">
                   <div className="profile-header">
-                    {userProfile?.photoURL ? (
-                      <div 
-                        style={{ 
-                          width: '60px', 
-                          height: '60px', 
-                          borderRadius: '50%', 
-                          overflow: 'hidden', 
-                          border: '2px solid white',
-                          backgroundColor: 'white',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center'
-                        }}
-                      >
+                    <div className="profile-picture-container-large">
+                      {userProfile?.photoURL ? (
                         <img
                           src={userProfile.photoURL}
-                          alt="Profile"
-                          style={{ 
-                            width: '100%', 
-                            height: '100%', 
-                            objectFit: 'cover',
-                            display: 'block'
-                          }}
+                          alt={userProfile.displayName}
+                          className="profile-picture-large"
                           onError={(e) => {
-                            console.error('Error loading profile image in dropdown:', e);
-                            e.target.onerror = null;
+                            console.error('Error loading large profile picture:', e);
                             e.target.style.display = 'none';
-                            const initialsDiv = document.createElement('div');
-                            initialsDiv.className = 'profile-initials-large';
-                            initialsDiv.textContent = getInitials(getUserName());
-                            e.target.parentNode.appendChild(initialsDiv);
+                            e.target.nextSibling.style.display = 'flex';
                           }}
                         />
+                      ) : null}
+                      <div 
+                        className="profile-initials-large"
+                        style={{ display: userProfile?.photoURL ? 'none' : 'flex' }}
+                      >
+                        {getInitials(userProfile?.displayName)}
                       </div>
-                    ) : (
-                      <div className="profile-initials-large">
-                        {getInitials(getUserName())}
-                      </div>
-                    )}
+                    </div>
                     <div className="profile-info">
-                      <h3>{getUserName()}</h3>
-                      <p>{user.email}</p>
+                      <h3>{userProfile?.displayName}</h3>
+                      <p>{userProfile?.email}</p>
                     </div>
                   </div>
                   

@@ -18,48 +18,36 @@ const googleProvider = new GoogleAuthProvider();
 // Sign up new user with email/password
 export const signup = async (email, password, username, bio) => {
   try {
-    // Check if a user with the same email already exists
-    const existingUsersByEmail = await getDocuments('users', [
-      { field: 'email', operator: '==', value: email }
-    ]);
-    
-    if (existingUsersByEmail.length > 0) {
-      throw new Error('An account with this email already exists');
-    }
-    
-    // Check if a user with the same username already exists
-    const existingUsersByUsername = await getDocuments('users', [
-      { field: 'username', operator: '==', value: username }
-    ]);
-    
-    if (existingUsersByUsername.length > 0) {
-      throw new Error('This username is already taken');
-    }
-    
-    // If no existing users found, proceed with account creation
+    // Create the user in Firebase Auth first
     const userCredential = await createUserWithEmailAndPassword(auth, email, password);
     const user = userCredential.user;
     
-    // Create user profile in Firestore
-    const userData = {
-      uid: user.uid,
-      username,
-      email,
-      bio,
-      photoURL: null,
-      createdAt: new Date(),
-      friends: [],
-      incomingRequests: [],
-      outgoingRequests: [],
-      onlineStatus: true,
-      lastSeen: new Date(),
-      updatedAt: new Date()
-    };
-    
-    await createUser(userData);
-    
     // Update auth profile
     await updateProfile(user, { displayName: username });
+    
+    // Try to create user profile in Firestore, but don't fail if it doesn't work
+    try {
+      // Create user profile in Firestore
+      const userData = {
+        uid: user.uid,
+        username,
+        email,
+        bio,
+        photoURL: null,
+        createdAt: new Date(),
+        friends: [],
+        incomingRequests: [],
+        outgoingRequests: [],
+        onlineStatus: true,
+        lastSeen: new Date(),
+        updatedAt: new Date()
+      };
+      
+      await createUser(userData);
+    } catch (firestoreError) {
+      console.warn('Could not create Firestore user document:', firestoreError);
+      // Continue even if Firestore document creation fails
+    }
     
     return user;
   } catch (error) {
@@ -75,43 +63,48 @@ export const signInWithGoogle = async () => {
     const user = result.user;
     console.log('Google sign-in successful:', user.uid);
 
-    // Check if user exists in Firestore
-    const existingUser = await getUser(user.uid);
-    
-    if (!existingUser) {
-      console.log('Creating new user document...');
-      // Create new user document with all specified fields
-      const userData = {
-        uid: user.uid,
-        username: user.displayName || user.email.split('@')[0],
-        email: user.email,
-        bio: '',
-        photoURL: user.photoURL || null,
-        onlineStatus: true,
-        friends: [],
-        incomingRequests: [],
-        outgoingRequests: [],
-        lastSeen: new Date(),
-        createdAt: new Date(),
-        updatedAt: new Date()
-      };
+    // Try to check if user exists in Firestore, but don't fail if it doesn't work
+    try {
+      const existingUser = await getUser(user.uid);
       
-      await createUser(userData);
-      console.log('New user document created successfully');
-    } else {
-      console.log('Updating existing user document...');
-      // Update existing user document with current information
-      const userData = {
-        username: user.displayName || existingUser.username,
-        email: user.email,
-        photoURL: user.photoURL || existingUser.photoURL,
-        onlineStatus: true,
-        lastSeen: new Date(),
-        updatedAt: new Date()
-      };
-      
-      await updateUser(user.uid, userData);
-      console.log('Existing user document updated successfully');
+      if (!existingUser) {
+        console.log('Creating new user document...');
+        // Create new user document with all specified fields
+        const userData = {
+          uid: user.uid,
+          username: user.displayName || user.email.split('@')[0],
+          email: user.email,
+          bio: '',
+          photoURL: user.photoURL || null,
+          onlineStatus: true,
+          friends: [],
+          incomingRequests: [],
+          outgoingRequests: [],
+          lastSeen: new Date(),
+          createdAt: new Date(),
+          updatedAt: new Date()
+        };
+        
+        await createUser(userData);
+        console.log('New user document created successfully');
+      } else {
+        console.log('Updating existing user document...');
+        // Update existing user document with current information
+        const userData = {
+          username: user.displayName || existingUser.username,
+          email: user.email,
+          photoURL: user.photoURL || existingUser.photoURL,
+          onlineStatus: true,
+          lastSeen: new Date(),
+          updatedAt: new Date()
+        };
+        
+        await updateUser(user.uid, userData);
+        console.log('Existing user document updated successfully');
+      }
+    } catch (firestoreError) {
+      console.warn('Firestore operation failed:', firestoreError);
+      // Continue even if Firestore operations fail
     }
 
     return user;
@@ -127,26 +120,32 @@ export const login = async (email, password) => {
     const userCredential = await signInWithEmailAndPassword(auth, email, password);
     const user = userCredential.user;
     
-    // Check if user exists in Firestore
-    const userExists = await checkUserExists(user.uid);
-    
-    if (!userExists) {
-      // Create user profile if it doesn't exist
-      await createUserProfile(user.uid, {
-        username: user.displayName || user.email.split('@')[0],
-        email: user.email,
-        bio: '',
-        photoURL: user.photoURL,
-        createdAt: new Date(),
-        friends: [],
-        incomingRequests: [],
-        outgoingRequests: [],
-        onlineStatus: true,
-        lastSeen: new Date()
-      });
-    } else {
-      // Update existing user's last seen and online status
-      await updateUserStatus(user.uid);
+    // Try to update user status in Firestore, but don't fail if it doesn't work
+    try {
+      // Check if user exists in Firestore
+      const userExists = await checkUserExists(user.uid);
+      
+      if (!userExists) {
+        // Create user profile if it doesn't exist
+        await createUserProfile(user.uid, {
+          username: user.displayName || user.email.split('@')[0],
+          email: user.email,
+          bio: '',
+          photoURL: user.photoURL,
+          createdAt: new Date(),
+          friends: [],
+          incomingRequests: [],
+          outgoingRequests: [],
+          onlineStatus: true,
+          lastSeen: new Date()
+        });
+      } else {
+        // Update existing user's last seen and online status
+        await updateUserStatus(user.uid);
+      }
+    } catch (firestoreError) {
+      console.warn('Firestore operation failed during login:', firestoreError);
+      // Continue even if Firestore operations fail
     }
     
     return user;
