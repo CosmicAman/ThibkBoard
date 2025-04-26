@@ -670,13 +670,19 @@
   .hero-section {
     min-height: 60vh;
     padding: 0.5rem;
+    
   }
   
   .hero-content h1 {
     font-size: 1.5rem;
     margin-bottom: 10px;
+    
   }
-  
+
+  .hero-content .secondary-btn{
+    font-size: 0.9rem;
+    max-width: 150px;
+  }
   .hero-subtitle {
     font-size: 0.9rem;
     margin-bottom: 20px;
