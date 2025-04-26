@@ -10,7 +10,7 @@ import './Chat.css';
 import { debounce } from 'lodash';
 
 const Chat = () => {
-  const { searchResults, friends, searchUsers, loading, setSearchResults } = useChat();
+  const { searchResults, friends, searchUsers, loading, setSearchResults, sendFriendRequest, outgoingFriendRequests } = useChat();
   const { user } = useAuth();
   const [searchTerm, setSearchTerm] = useState('');
   const [isSearching, setIsSearching] = useState(false);
@@ -41,6 +41,14 @@ const Chat = () => {
     debouncedSearch(value);
   };
 
+  const handleAddFriend = async (userData) => {
+    try {
+      await sendFriendRequest(userData.id);
+    } catch (error) {
+      console.error('Error sending friend request:', error);
+    }
+  };
+
   return (
     <div className="chat-container">
       <div className="chat-sidebar">
@@ -56,12 +64,21 @@ const Chat = () => {
             />
           </div>
           {isSearching && <div className="search-loading">Searching...</div>}
-          {searchResults.length > 0 && (
+          {!isSearching && searchResults.length > 0 && (
             <div className="search-results">
               {searchResults.map((userData) => (
-                <SearchUserCard key={userData.id} userData={userData} />
+                <SearchUserCard
+                  key={userData.id}
+                  user={userData}
+                  onAddFriend={() => handleAddFriend(userData)}
+                  isFriend={friends.includes(userData.id)}
+                  hasRequest={outgoingFriendRequests.includes(userData.id)}
+                />
               ))}
             </div>
+          )}
+          {!isSearching && searchTerm && searchResults.length === 0 && (
+            <div className="no-results">No users found</div>
           )}
         </div>
 

@@ -48,16 +48,37 @@ export const ChatProvider = ({ children }) => {
     try {
       setLoading(true);
       const usersRef = collection(db, 'users');
-      const q = query(
+      
+      // Search by email
+      const emailQuery = query(
         usersRef,
         where('email', '>=', searchTerm),
         where('email', '<=', searchTerm + '\uf8ff')
       );
-      const querySnapshot = await getDocs(q);
-      const results = querySnapshot.docs
-        .map(doc => ({ id: doc.id, ...doc.data() }))
-        .filter(userData => userData.id !== user.uid);
-      setSearchResults(results);
+      
+      // Search by username
+      const usernameQuery = query(
+        usersRef,
+        where('username', '>=', searchTerm),
+        where('username', '<=', searchTerm + '\uf8ff')
+      );
+
+      const [emailSnapshot, usernameSnapshot] = await Promise.all([
+        getDocs(emailQuery),
+        getDocs(usernameQuery)
+      ]);
+
+      // Combine and deduplicate results
+      const results = new Map();
+      
+      [...emailSnapshot.docs, ...usernameSnapshot.docs].forEach(doc => {
+        const userData = { id: doc.id, ...doc.data() };
+        if (userData.id !== user.uid) {
+          results.set(userData.id, userData);
+        }
+      });
+
+      setSearchResults(Array.from(results.values()));
     } catch (error) {
       console.error('Error searching users:', error);
     } finally {
