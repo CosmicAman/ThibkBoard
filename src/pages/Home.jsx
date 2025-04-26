@@ -41,12 +41,17 @@ const Home = ({ setCurrentPage }) => {
     <div className="home-container">
       <section className="hero-section">
         <div className="hero-content">
-          <h1>Welcome to ThinkBoard</h1>
-          <p className="hero-subtitle">Your all-in-one learning and productivity platform</p>
+          <h1>Elevate Your Learning with ThinkBoard</h1>
+          <p className="hero-subtitle">The comprehensive platform for knowledge management and collaborative productivity</p>
           {!user && (
             <div className="cta-buttons">
-              <button className="primary-btn" onClick={handleGetStarted}>Get Started</button>
-              <button className="secondary-btn" onClick={handleLearnMore}>Learn More</button>
+              <button className="primary-btn large" onClick={handleGetStarted}>Start Your Journey</button>
+              <button className="secondary-btn" onClick={handleLearnMore}>Discover Features</button>
+            </div>
+          )}
+          {user && (
+            <div className="cta-buttons">
+              <button className="primary-btn large" onClick={handleExploreDashboard}>Access Dashboard</button>
             </div>
           )}
         </div>
@@ -87,8 +92,8 @@ const Home = ({ setCurrentPage }) => {
           
           <div className="feature-card" onClick={() => handleFeatureClick('chat')}>
             <div className="feature-icon">💬</div>
-            <h3>AI Chat Assistant</h3>
-            <p>Get help and answers to your questions with our intelligent chat assistant.</p>
+            <h3>Friend Chat</h3>
+            <p>Message directly with classmates and friends to collaborate on projects or just stay connected.</p>
           </div>
         </div>
       </section>
@@ -168,7 +173,7 @@ const Home = ({ setCurrentPage }) => {
       </section>
 
       <section className="cta-section">
-        <h2>Ready to Enhance Your Learning Experience?</h2>
+        <h2>Enhance Your Learning</h2>
         <p>Join thousands of students, educators, and professionals who use ThinkBoard every day.</p>
         {!user ? (
           <button className="primary-btn large" onClick={handleGetStarted}>Get Started for Free</button>

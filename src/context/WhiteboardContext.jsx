@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect } from 'react';
+import { createContext, useContext, useState, useEffect, useRef } from 'react';
 import { addDocument, getDocument, updateDocument, getDocuments, deleteDocument } from '../firebase/firestore';
 import { useAuth } from './AuthContext';
 
@@ -23,6 +23,12 @@ export const WhiteboardProvider = ({ children }) => {
   const [currentWhiteboard, setCurrentWhiteboard] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
+  
+  // Add cache refs to reduce database reads
+  const whiteboardsCacheRef = useRef({});
+  const lastFetchTimeRef = useRef(null);
+  const pendingUpdatesRef = useRef([]);
+  const updateTimeoutRef = useRef(null);
 
   console.log('WhiteboardProvider rendering with user:', user);
 
@@ -34,6 +40,17 @@ export const WhiteboardProvider = ({ children }) => {
       try {
         setIsLoading(true);
         setError(null);
+        
+        // Check if we have a recent cache (less than 5 minutes old)
+        const now = Date.now();
+        if (whiteboardsCacheRef.current[userId] && lastFetchTimeRef.current && 
+            (now - lastFetchTimeRef.current) < 300000) { // 5 minutes
+          console.log('Using cached whiteboards');
+          setWhiteboards(whiteboardsCacheRef.current[userId]);
+          setCurrentWhiteboard(whiteboardsCacheRef.current[userId][0]);
+          setIsLoading(false);
+          return;
+        }
         
         const userWhiteboards = await getDocuments('whiteboards', [
           ['userId', '==', userId]
@@ -55,9 +72,17 @@ export const WhiteboardProvider = ({ children }) => {
             ...newWhiteboard
           };
           
+          // Update cache
+          whiteboardsCacheRef.current[userId] = [createdWhiteboard];
+          lastFetchTimeRef.current = now;
+          
           setWhiteboards([createdWhiteboard]);
           setCurrentWhiteboard(createdWhiteboard);
         } else {
+          // Update cache
+          whiteboardsCacheRef.current[userId] = userWhiteboards;
+          lastFetchTimeRef.current = now;
+          
           setWhiteboards(userWhiteboards);
           setCurrentWhiteboard(userWhiteboards[0]);
         }
@@ -81,6 +106,59 @@ export const WhiteboardProvider = ({ children }) => {
       setIsLoading(false);
     }
   }, [user]);
+
+  // Process pending updates in batches
+  const processPendingUpdates = async () => {
+    if (pendingUpdatesRef.current.length === 0) return;
+    
+    try {
+      console.log(`Processing ${pendingUpdatesRef.current.length} pending updates`);
+      
+      // Group updates by whiteboard ID
+      const updatesByWhiteboard = {};
+      pendingUpdatesRef.current.forEach(update => {
+        if (!updatesByWhiteboard[update.whiteboardId]) {
+          updatesByWhiteboard[update.whiteboardId] = {};
+        }
+        updatesByWhiteboard[update.whiteboardId] = {
+          ...updatesByWhiteboard[update.whiteboardId],
+          ...update.updates
+        };
+      });
+      
+      // Process each whiteboard's updates
+      for (const [whiteboardId, updates] of Object.entries(updatesByWhiteboard)) {
+        await updateDocument('whiteboards', whiteboardId, {
+          ...updates,
+          updatedAt: new Date().toISOString()
+        });
+        
+        // Update local state
+        setWhiteboards(prevWhiteboards => 
+          prevWhiteboards.map(wb => 
+            wb.id === whiteboardId 
+              ? { ...wb, ...updates, updatedAt: new Date().toISOString() }
+              : wb
+          )
+        );
+        
+        // Update current whiteboard if it's the one being edited
+        if (currentWhiteboard?.id === whiteboardId) {
+          setCurrentWhiteboard(prev => ({
+            ...prev,
+            ...updates,
+            updatedAt: new Date().toISOString()
+          }));
+        }
+      }
+      
+      // Clear pending updates
+      pendingUpdatesRef.current = [];
+    } catch (error) {
+      console.error('Error processing pending updates:', error);
+      setError('Failed to process updates: ' + error.message);
+    }
+  };
 
   const saveWhiteboard = async (userId, whiteboardData) => {
     try {
@@ -111,6 +189,13 @@ export const WhiteboardProvider = ({ children }) => {
         ...whiteboardWithUser
       };
 
+      // Update cache
+      if (whiteboardsCacheRef.current[userId]) {
+        whiteboardsCacheRef.current[userId] = [...whiteboardsCacheRef.current[userId], savedWhiteboard];
+      } else {
+        whiteboardsCacheRef.current[userId] = [savedWhiteboard];
+      }
+
       setWhiteboards(prev => [...prev, savedWhiteboard]);
       setCurrentWhiteboard(savedWhiteboard);
 
@@ -133,6 +218,13 @@ export const WhiteboardProvider = ({ children }) => {
       // Check if user is authenticated
       if (!user) {
         throw new Error('User must be authenticated to load whiteboards');
+      }
+
+      // Check cache first
+      const cachedWhiteboard = whiteboards.find(wb => wb.id === whiteboardId);
+      if (cachedWhiteboard) {
+        setCurrentWhiteboard(cachedWhiteboard);
+        return cachedWhiteboard;
       }
 
       const whiteboard = await getDocument('whiteboards', whiteboardId);
@@ -162,13 +254,26 @@ export const WhiteboardProvider = ({ children }) => {
         throw new Error('User must be authenticated to update whiteboards');
       }
       
-      // Update the whiteboard in Firestore
-      await updateDocument('whiteboards', whiteboardId, {
-        ...updates,
-        updatedAt: new Date().toISOString()
+      // Add to pending updates
+      pendingUpdatesRef.current.push({
+        whiteboardId,
+        updates: {
+          ...updates,
+          updatedAt: new Date().toISOString()
+        }
       });
       
-      // Update the local state
+      // Clear any existing timeout
+      if (updateTimeoutRef.current) {
+        clearTimeout(updateTimeoutRef.current);
+      }
+      
+      // Set a new timeout to process updates in batch
+      updateTimeoutRef.current = setTimeout(() => {
+        processPendingUpdates();
+      }, 2000); // Process updates after 2 seconds of inactivity
+      
+      // Update local state immediately for better UX
       setWhiteboards(prevWhiteboards => 
         prevWhiteboards.map(wb => 
           wb.id === whiteboardId 
@@ -203,22 +308,24 @@ export const WhiteboardProvider = ({ children }) => {
         throw new Error('User must be authenticated to delete whiteboards');
       }
       
-      // Delete the whiteboard from Firestore
+      // Remove from cache
+      if (whiteboardsCacheRef.current[user.uid]) {
+        whiteboardsCacheRef.current[user.uid] = whiteboardsCacheRef.current[user.uid].filter(
+          wb => wb.id !== whiteboardId
+        );
+      }
+      
+      // Delete from Firestore
       await deleteDocument('whiteboards', whiteboardId);
       
-      // Update the local state
+      // Update local state
       setWhiteboards(prevWhiteboards => 
         prevWhiteboards.filter(wb => wb.id !== whiteboardId)
       );
       
-      // If the deleted whiteboard was the current one, set a new current whiteboard
+      // Update current whiteboard if it's the one being deleted
       if (currentWhiteboard?.id === whiteboardId) {
-        const remainingWhiteboards = whiteboards.filter(wb => wb.id !== whiteboardId);
-        if (remainingWhiteboards.length > 0) {
-          setCurrentWhiteboard(remainingWhiteboards[0]);
-        } else {
-          setCurrentWhiteboard(null);
-        }
+        setCurrentWhiteboard(whiteboards.find(wb => wb.id !== whiteboardId) || null);
       }
     } catch (error) {
       console.error('Error deleting whiteboard:', error);
@@ -227,6 +334,20 @@ export const WhiteboardProvider = ({ children }) => {
       setIsLoading(false);
     }
   };
+
+  // Clean up on unmount
+  useEffect(() => {
+    return () => {
+      if (updateTimeoutRef.current) {
+        clearTimeout(updateTimeoutRef.current);
+      }
+      
+      // Process any remaining updates before unmounting
+      if (pendingUpdatesRef.current.length > 0) {
+        processPendingUpdates();
+      }
+    };
+  }, []);
 
   const value = {
     whiteboards,
@@ -238,8 +359,6 @@ export const WhiteboardProvider = ({ children }) => {
     updateWhiteboard,
     deleteWhiteboard
   };
-
-  console.log('WhiteboardProvider value:', value);
 
   return (
     <WhiteboardContext.Provider value={value}>
@@ -254,4 +373,6 @@ export const useWhiteboard = () => {
     throw new Error('useWhiteboard must be used within a WhiteboardProvider');
   }
   return context;
-}; 
+};
+
+export default WhiteboardContext; 

@@ -212,7 +212,7 @@ export const CommunityProvider = ({ children }) => {
       };
 
       // Add the comment
-      await addDoc(commentsRef, newComment);
+      const docRef = await addDoc(commentsRef, newComment);
 
       // Update the comment count
       const postRef = doc(db, 'posts', postId);
@@ -220,7 +220,7 @@ export const CommunityProvider = ({ children }) => {
         commentCount: increment(1)
       });
 
-      return { id: postId, ...newComment };
+      return { id: docRef.id, ...newComment };
     } catch (err) {
       console.error('Error adding comment:', err);
       throw new Error('Failed to add comment');
@@ -287,16 +287,123 @@ export const CommunityProvider = ({ children }) => {
   // Get comments for a post
   const getComments = async (postId) => {
     try {
+      console.log('Fetching comments for post:', postId);
       const commentsRef = collection(db, 'posts', postId, 'comments');
       const q = query(commentsRef, orderBy('createdAt', 'desc'));
       const snapshot = await getDocs(q);
-      return snapshot.docs.map(doc => ({
+      
+      // Get all comments
+      const comments = snapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data()
       }));
+      
+      console.log('Found comments:', comments);
+      
+      // For each comment, get its replies
+      const commentsWithReplies = await Promise.all(
+        comments.map(async (comment) => {
+          try {
+            const repliesRef = collection(db, 'posts', postId, 'comments', comment.id, 'replies');
+            const repliesSnapshot = await getDocs(repliesRef);
+            const replies = repliesSnapshot.docs.map(doc => ({
+              id: doc.id,
+              ...doc.data()
+            }));
+            console.log(`Found ${replies.length} replies for comment ${comment.id}`);
+            return {
+              ...comment,
+              replies: replies || []
+            };
+          } catch (err) {
+            console.error(`Error fetching replies for comment ${comment.id}:`, err);
+            return {
+              ...comment,
+              replies: []
+            };
+          }
+        })
+      );
+      
+      console.log('Comments with replies:', commentsWithReplies);
+      return commentsWithReplies;
     } catch (err) {
       console.error('Error fetching comments:', err);
       throw new Error('Failed to fetch comments');
+    }
+  };
+
+  // Add a reply to a comment
+  const addReply = async (postId, commentId, content) => {
+    try {
+      if (!user) throw new Error('User must be logged in to reply');
+
+      const repliesRef = collection(db, 'posts', postId, 'comments', commentId, 'replies');
+      const newReply = {
+        userId: user.uid,
+        username: user.displayName || 'Anonymous',
+        content,
+        createdAt: serverTimestamp()
+      };
+
+      // Add the reply
+      const docRef = await addDoc(repliesRef, newReply);
+
+      return { id: docRef.id, ...newReply };
+    } catch (err) {
+      console.error('Error adding reply:', err);
+      throw new Error('Failed to add reply');
+    }
+  };
+
+  // Update a reply
+  const updateReply = async (postId, commentId, replyId, content) => {
+    try {
+      if (!user) throw new Error('User must be logged in to update a reply');
+
+      const replyRef = doc(db, 'posts', postId, 'comments', commentId, 'replies', replyId);
+      const replyDoc = await getDoc(replyRef);
+      
+      if (!replyDoc.exists()) throw new Error('Reply not found');
+      if (replyDoc.data().userId !== user.uid) throw new Error('Not authorized to update this reply');
+
+      const updateData = {
+        content,
+        updatedAt: serverTimestamp()
+      };
+
+      await updateDoc(replyRef, updateData);
+
+      // Return the updated reply data
+      return {
+        id: replyId,
+        ...replyDoc.data(),
+        ...updateData
+      };
+    } catch (err) {
+      console.error('Error updating reply:', err);
+      throw new Error('Failed to update reply');
+    }
+  };
+
+  // Delete a reply
+  const deleteReply = async (postId, commentId, replyId) => {
+    try {
+      if (!user) throw new Error('User must be logged in to delete a reply');
+
+      const replyRef = doc(db, 'posts', postId, 'comments', commentId, 'replies', replyId);
+      const replyDoc = await getDoc(replyRef);
+      
+      if (!replyDoc.exists()) throw new Error('Reply not found');
+      if (replyDoc.data().userId !== user.uid) throw new Error('Not authorized to delete this reply');
+
+      // Delete the reply
+      await deleteDoc(replyRef);
+
+      return true;
+    } catch (err) {
+      console.error('Error deleting reply:', err);
+      throw new Error('Failed to delete reply');
     }
   };
 
@@ -313,7 +420,10 @@ export const CommunityProvider = ({ children }) => {
     addComment,
     updateComment,
     deleteComment,
-    getComments
+    getComments,
+    addReply,
+    updateReply,
+    deleteReply
   };
 
   return (

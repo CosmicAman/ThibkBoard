@@ -20,7 +20,10 @@ const Community = () => {
     addComment,
     getComments,
     updateComment,
-    deleteComment
+    deleteComment,
+    addReply,
+    updateReply,
+    deleteReply
   } = useCommunity();
 
   const [newPostContent, setNewPostContent] = useState('');
@@ -33,6 +36,10 @@ const Community = () => {
   const [newCommentText, setNewCommentText] = useState('');
   const [editingCommentId, setEditingCommentId] = useState(null);
   const [editedCommentText, setEditedCommentText] = useState('');
+  const [replyingToCommentId, setReplyingToCommentId] = useState(null);
+  const [replyText, setReplyText] = useState('');
+  const [editingReplyId, setEditingReplyId] = useState(null);
+  const [editedReplyText, setEditedReplyText] = useState('');
   const fileInputRef = useRef(null);
   const [postContent, setPostContent] = useState('');
   const [postImage, setPostImage] = useState(null);
@@ -46,6 +53,7 @@ const Community = () => {
       if (expandedPostId) {
         try {
           const postComments = await getComments(expandedPostId);
+          console.log('Loaded comments:', postComments); // Debug log
           setComments(prev => ({
             ...prev,
             [expandedPostId]: postComments
@@ -173,16 +181,40 @@ const Community = () => {
     if (!newCommentText.trim()) return;
 
     try {
-      await addComment(postId, newCommentText);
+      console.log('Adding comment to post:', postId);
+      const result = await addComment(postId, newCommentText);
+      console.log('Comment added:', result);
       setNewCommentText('');
       // Refresh comments
       const updatedComments = await getComments(postId);
+      console.log('Updated comments:', updatedComments);
       setComments(prev => ({
         ...prev,
         [postId]: updatedComments
       }));
     } catch (error) {
       console.error('Error adding comment:', error);
+    }
+  };
+
+  const handleAddReply = async (postId, commentId) => {
+    if (!replyText.trim()) return;
+
+    try {
+      console.log('Adding reply to comment:', commentId, 'in post:', postId);
+      const result = await addReply(postId, commentId, replyText);
+      console.log('Reply added:', result);
+      setReplyText('');
+      setReplyingToCommentId(null);
+      // Refresh comments
+      const updatedComments = await getComments(postId);
+      console.log('Updated comments with replies:', updatedComments);
+      setComments(prev => ({
+        ...prev,
+        [postId]: updatedComments
+      }));
+    } catch (error) {
+      console.error('Error adding reply:', error);
     }
   };
 
@@ -216,6 +248,40 @@ const Community = () => {
         }));
       } catch (error) {
         console.error('Error deleting comment:', error);
+      }
+    }
+  };
+
+  const handleEditReply = async (postId, commentId, replyId) => {
+    if (!editedReplyText.trim()) return;
+    
+    try {
+      await updateReply(postId, commentId, replyId, editedReplyText);
+      // Refresh comments
+      const updatedComments = await getComments(postId);
+      setComments(prev => ({
+        ...prev,
+        [postId]: updatedComments
+      }));
+      setEditingReplyId(null);
+      setEditedReplyText('');
+    } catch (error) {
+      console.error('Error editing reply:', error);
+    }
+  };
+
+  const handleDeleteReply = async (postId, commentId, replyId) => {
+    if (window.confirm('Are you sure you want to delete this reply?')) {
+      try {
+        await deleteReply(postId, commentId, replyId);
+        // Refresh comments
+        const updatedComments = await getComments(postId);
+        setComments(prev => ({
+          ...prev,
+          [postId]: updatedComments
+        }));
+      } catch (error) {
+        console.error('Error deleting reply:', error);
       }
     }
   };
@@ -422,74 +488,173 @@ const Community = () => {
                       </button>
                     </div>
                     <div className="comments-list">
-                      {comments[post.id]?.map(comment => (
-                        <div key={comment.id} className="comment">
-                          <div className="comment-header">
-                            <span className="comment-username">{comment.username}</span>
-                            <span className="comment-timestamp">
-                              {formatDate(comment.createdAt)}
-                            </span>
-                            {comment.userId === user.uid && (
-                              <div className="comment-actions">
-                                {editingCommentId === comment.id ? (
-                                  <>
-                                    <button 
-                                      className="save-comment-btn"
-                                      onClick={() => handleEditComment(post.id, comment.id)}
-                                      disabled={!editedCommentText.trim()}
-                                    >
-                                      Save
-                                    </button>
-                                    <button 
-                                      className="cancel-comment-btn"
-                                      onClick={() => {
-                                        setEditingCommentId(null);
-                                        setEditedCommentText('');
-                                      }}
-                                    >
-                                      Cancel
-                                    </button>
-                                  </>
-                                ) : (
-                                  <>
-                                    <button 
-                                      className="edit-comment-btn"
-                                      onClick={() => {
-                                        setEditingCommentId(comment.id);
-                                        setEditedCommentText(comment.content);
-                                      }}
-                                    >
-                                      Edit
-                                    </button>
-                                    <button 
-                                      className="delete-comment-btn"
-                                      onClick={() => handleDeleteComment(post.id, comment.id)}
-                                    >
-                                      Delete
-                                    </button>
-                                  </>
-                                )}
+                      {comments[post.id] && comments[post.id].length > 0 ? (
+                        comments[post.id].map(comment => (
+                          <div key={comment.id} className="comment">
+                            <div className="comment-header">
+                              <span className="comment-username">{comment.username}</span>
+                              <span className="comment-timestamp">
+                                {formatDate(comment.createdAt)}
+                              </span>
+                              {comment.userId === user.uid && (
+                                <div className="comment-actions">
+                                  {editingCommentId === comment.id ? (
+                                    <>
+                                      <button 
+                                        className="save-comment-btn"
+                                        onClick={() => handleEditComment(post.id, comment.id)}
+                                        disabled={!editedCommentText.trim()}
+                                      >
+                                        Save
+                                      </button>
+                                      <button 
+                                        className="cancel-comment-btn"
+                                        onClick={() => {
+                                          setEditingCommentId(null);
+                                          setEditedCommentText('');
+                                        }}
+                                      >
+                                        Cancel
+                                      </button>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <button 
+                                        className="edit-comment-btn"
+                                        onClick={() => {
+                                          setEditingCommentId(comment.id);
+                                          setEditedCommentText(comment.content);
+                                        }}
+                                      >
+                                        Edit
+                                      </button>
+                                      <button 
+                                        className="delete-comment-btn"
+                                        onClick={() => handleDeleteComment(post.id, comment.id)}
+                                      >
+                                        Delete
+                                      </button>
+                                    </>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                            {editingCommentId === comment.id ? (
+                              <textarea
+                                className="edit-comment-input"
+                                value={editedCommentText}
+                                onChange={(e) => setEditedCommentText(e.target.value)}
+                                placeholder="Edit your comment..."
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter' && !e.shiftKey) {
+                                    e.preventDefault();
+                                    handleEditComment(post.id, comment.id);
+                                  }
+                                }}
+                              />
+                            ) : (
+                              <p className="comment-content">{comment.content}</p>
+                            )}
+
+                            {/* Reply button */}
+                            <button 
+                              className="reply-button"
+                              onClick={() => setReplyingToCommentId(replyingToCommentId === comment.id ? null : comment.id)}
+                            >
+                              Reply
+                            </button>
+
+                            {/* Reply input */}
+                            {replyingToCommentId === comment.id && (
+                              <div className="reply-input-container">
+                                <textarea
+                                  value={replyText}
+                                  onChange={(e) => setReplyText(e.target.value)}
+                                  placeholder="Write a reply..."
+                                  className="reply-input"
+                                />
+                                <button 
+                                  onClick={() => handleAddReply(post.id, comment.id)}
+                                  disabled={!replyText.trim()}
+                                  className="reply-submit-btn"
+                                >
+                                  Reply
+                                </button>
+                              </div>
+                            )}
+
+                            {/* Replies section */}
+                            {comment.replies && comment.replies.length > 0 && (
+                              <div className="replies-section">
+                                {comment.replies.map(reply => (
+                                  <div key={reply.id} className="reply">
+                                    <div className="reply-header">
+                                      <span className="reply-username">{reply.username}</span>
+                                      <span className="reply-timestamp">
+                                        {formatDate(reply.createdAt)}
+                                      </span>
+                                      {reply.userId === user.uid && (
+                                        <div className="reply-actions">
+                                          {editingReplyId === reply.id ? (
+                                            <>
+                                              <button 
+                                                className="save-reply-btn"
+                                                onClick={() => handleEditReply(post.id, comment.id, reply.id)}
+                                                disabled={!editedReplyText.trim()}
+                                              >
+                                                Save
+                                              </button>
+                                              <button 
+                                                className="cancel-reply-btn"
+                                                onClick={() => {
+                                                  setEditingReplyId(null);
+                                                  setEditedReplyText('');
+                                                }}
+                                              >
+                                                Cancel
+                                              </button>
+                                            </>
+                                          ) : (
+                                            <>
+                                              <button 
+                                                className="edit-reply-btn"
+                                                onClick={() => {
+                                                  setEditingReplyId(reply.id);
+                                                  setEditedReplyText(reply.content);
+                                                }}
+                                              >
+                                                Edit
+                                              </button>
+                                              <button 
+                                                className="delete-reply-btn"
+                                                onClick={() => handleDeleteReply(post.id, comment.id, reply.id)}
+                                              >
+                                                Delete
+                                              </button>
+                                            </>
+                                          )}
+                                        </div>
+                                      )}
+                                    </div>
+                                    {editingReplyId === reply.id ? (
+                                      <textarea
+                                        className="edit-reply-input"
+                                        value={editedReplyText}
+                                        onChange={(e) => setEditedReplyText(e.target.value)}
+                                        placeholder="Edit your reply..."
+                                      />
+                                    ) : (
+                                      <p className="reply-content">{reply.content}</p>
+                                    )}
+                                  </div>
+                                ))}
                               </div>
                             )}
                           </div>
-                          {editingCommentId === comment.id ? (
-                            <textarea
-                              className="edit-comment-input"
-                              value={editedCommentText}
-                              onChange={(e) => setEditedCommentText(e.target.value)}
-                              placeholder="Edit your comment..."
-                              onKeyDown={(e) => {
-                                if (e.key === 'Enter' && !e.shiftKey) {
-                                  e.preventDefault();
-                                  handleEditComment(post.id, comment.id);
-                                }
-                              }}
-                            />
-                          ) : (
-                            <p className="comment-content">{comment.content}</p>
-                          )}
-                        </div>
-                      ))}
+                        ))
+                      ) : (
+                        <p className="no-comments">No comments yet. Be the first to comment!</p>
+                      )}
                     </div>
                   </div>
                 )}

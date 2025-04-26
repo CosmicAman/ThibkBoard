@@ -13,6 +13,13 @@ import {
   redo
 } from '../utils/whiteboard';
 import './Whiteboard.css';
+import { debounce } from 'lodash';
+import { compress, decompress } from 'lz-string';
+
+// Add debounce utility
+const debouncedSave = debounce((func) => {
+  func();
+}, 5000); // Increase debounce time to 5 seconds
 
 const Whiteboard = () => {
   console.log('Whiteboard component rendering');
@@ -20,6 +27,8 @@ const Whiteboard = () => {
   // Refs
   const canvasRef = useRef(null);
   const containerRef = useRef(null);
+  const lastSavedContentRef = useRef(null);
+  const hasUnsavedChangesRef = useRef(false);
 
   // Context
   const { user } = useAuth();
@@ -57,6 +66,7 @@ const Whiteboard = () => {
   const [selectedWhiteboard, setSelectedWhiteboard] = useState(null);
   const [showWhiteboardModal, setShowWhiteboardModal] = useState(false);
   const [localWhiteboards, setLocalWhiteboards] = useState([]);
+  const [lastSaveTime, setLastSaveTime] = useState(null);
 
   // Move resizeCanvas to component scope
   const resizeCanvas = useCallback(() => {
@@ -120,69 +130,113 @@ const Whiteboard = () => {
     };
   }, [resizeCanvas]);
 
-  // Save to local storage
+  // Save to local storage with debouncing
+  const debouncedSaveToLocalStorage = useCallback(
+    debounce(() => {
+      if (!isInitialized || !canvasRef.current) return;
+      
+      try {
+        const canvas = canvasRef.current;
+        const content = canvas.toDataURL('image/png');
+        
+        // Only save if content has changed
+        if (content !== lastSavedContentRef.current) {
+          const draftData = {
+            content,
+            timestamp: new Date().toISOString(),
+            tool,
+            color,
+            strokeSize,
+            history: history.map(data => ({
+              data: Array.from(data.data),
+              width: data.width,
+              height: data.height
+            })),
+            currentHistoryIndex
+          };
+          localStorage.setItem('whiteboard_draft', JSON.stringify(draftData));
+          lastSavedContentRef.current = content;
+          console.log('Auto-saved to local storage');
+        }
+      } catch (error) {
+        console.error('Error saving to local storage:', error);
+      }
+    }, 2000), // 2 second debounce
+    [isInitialized, tool, color, strokeSize, history, currentHistoryIndex]
+  );
+
+  // Save to local storage with compression
   const saveToLocalStorage = () => {
-    if (!isInitialized || !canvasRef.current) return;
+    if (!canvasRef.current || !isInitialized) return;
     
     try {
+      // Get the canvas data
       const canvas = canvasRef.current;
-      const content = canvas.toDataURL('image/png');
-      const draftData = {
-        content,
-        timestamp: new Date().toISOString(),
-        tool,
-        color,
-        strokeSize,
-        history: history.map(data => data.data),
-        currentHistoryIndex
-      };
-      localStorage.setItem('whiteboard_draft', JSON.stringify(draftData));
-      console.log('Auto-saved to local storage');
+      const dataURL = canvas.toDataURL('image/jpeg', 0.7); // Use JPEG with lower quality
+      
+      // Compress the data
+      const compressedData = compress(dataURL);
+      
+      // Save to local storage with timestamp
+      localStorage.setItem('whiteboard_draft', JSON.stringify({
+        content: compressedData,
+        timestamp: new Date().toISOString()
+      }));
+      
+      console.log('Saved to local storage');
     } catch (error) {
       console.error('Error saving to local storage:', error);
+      // If we hit the quota limit, try to save with even lower quality
+      if (error.name === 'QuotaExceededError') {
+        try {
+          const canvas = canvasRef.current;
+          const dataURL = canvas.toDataURL('image/jpeg', 0.5); // Even lower quality
+          const compressedData = compress(dataURL);
+          localStorage.setItem('whiteboard_draft', JSON.stringify({
+            content: compressedData,
+            timestamp: new Date().toISOString()
+          }));
+        } catch (retryError) {
+          console.error('Failed to save even with reduced quality:', retryError);
+        }
+      }
     }
   };
 
-  // Load from local storage
+  // Load from local storage with decompression
   const loadFromLocalStorage = async (canvas) => {
     try {
-      const savedDraft = localStorage.getItem('whiteboard_draft');
-      if (savedDraft) {
-        const { content, timestamp, tool: savedTool, color: savedColor, 
-                strokeSize: savedStrokeSize, history: savedHistory, 
-                currentHistoryIndex: savedHistoryIndex } = JSON.parse(savedDraft);
+      const savedData = localStorage.getItem('whiteboard_draft');
+      if (savedData) {
+        const { content, timestamp, tool: savedTool, color: savedColor, strokeSize: savedStrokeSize, history: savedHistory, currentHistoryIndex: savedHistoryIndex } = JSON.parse(savedData);
         
-        // Only load if the draft is less than 1 hour old
-        const draftAge = (new Date() - new Date(timestamp)) / (1000 * 60 * 60);
-        if (draftAge < 1) {
-          await loadCanvasFromDataURL(canvas, content);
-          setCurrentImageData(canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height));
-          
-          // Restore tool state
-          if (savedTool) setTool(savedTool);
-          if (savedColor) setColor(savedColor);
-          if (savedStrokeSize) setStrokeSize(savedStrokeSize);
-          
-          // Restore history
-          if (savedHistory && savedHistory.length > 0) {
-            const restoredHistory = savedHistory.map(data => {
-              const imageData = new ImageData(
-                new Uint8ClampedArray(data),
-                canvas.width,
-                canvas.height
-              );
-              return imageData;
-            });
-            setHistory(restoredHistory);
-            setCurrentHistoryIndex(savedHistoryIndex);
-          }
-          
-          console.log('Loaded from local storage');
-          return true;
-        } else {
-          console.log('Draft too old, clearing local storage');
-          localStorage.removeItem('whiteboard_draft');
+        // Decompress the data
+        const decompressedData = decompress(content);
+        
+        // Load the image
+        await loadCanvasFromDataURL(canvas, decompressedData);
+        
+        // Restore tool settings
+        if (savedTool) setTool(savedTool);
+        if (savedColor) setColor(savedColor);
+        if (savedStrokeSize) setStrokeSize(savedStrokeSize);
+        
+        // Restore history if available
+        if (savedHistory && savedHistoryIndex !== undefined) {
+          const restoredHistory = savedHistory.map(item => {
+            const imageData = new ImageData(
+              new Uint8ClampedArray(item.data),
+              item.width,
+              item.height
+            );
+            return imageData;
+          });
+          setHistory(restoredHistory);
+          setCurrentHistoryIndex(savedHistoryIndex);
         }
+        
+        console.log('Loaded from local storage');
+        return true;
       }
       return false;
     } catch (error) {
@@ -262,7 +316,7 @@ const Whiteboard = () => {
     };
   }, [currentWhiteboard, contextLoading]);
 
-  // Auto-save effect
+  // Auto-save effect with optimized dependencies
   useEffect(() => {
     if (!isInitialized) return;
 
@@ -271,10 +325,13 @@ const Whiteboard = () => {
       clearTimeout(autoSaveTimer);
     }
 
-    // Set up new auto-save timer
+    // Set up new auto-save timer with longer interval
     const timer = setTimeout(() => {
-      saveToLocalStorage();
-    }, 30000); // Auto-save every 30 seconds
+      if (hasUnsavedChangesRef.current) {
+        debouncedSave(saveToLocalStorage);
+        hasUnsavedChangesRef.current = false;
+      }
+    }, 60000); // Auto-save every 60 seconds
 
     setAutoSaveTimer(timer);
 
@@ -283,7 +340,7 @@ const Whiteboard = () => {
         clearTimeout(timer);
       }
     };
-  }, [isInitialized, currentImageData, tool, color, strokeSize, history, currentHistoryIndex]);
+  }, [isInitialized]);
 
   const getCanvasCoordinates = (e) => {
     const canvas = canvasRef.current;
@@ -327,41 +384,44 @@ const Whiteboard = () => {
     const coords = getCanvasCoordinates(e);
     const ctx = canvas.getContext('2d');
     
-    if (tool === WHITEBOARD_TOOLS.PEN || tool === WHITEBOARD_TOOLS.ERASER) {
-      ctx.beginPath();
-      ctx.moveTo(startPoint.x, startPoint.y);
-      ctx.lineTo(coords.x, coords.y);
-      ctx.strokeStyle = tool === WHITEBOARD_TOOLS.ERASER ? '#FFFFFF' : color;
-      ctx.lineWidth = strokeSize;
-      ctx.lineCap = 'round';
-      ctx.lineJoin = 'round';
-      ctx.stroke();
-      
-      setStartPoint(coords);
-    } else if (tool === WHITEBOARD_TOOLS.RECTANGLE || tool === WHITEBOARD_TOOLS.CIRCLE) {
-      // Clear canvas and restore previous state
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      if (currentImageData) {
-        ctx.putImageData(currentImageData, 0, 0);
+    // Use requestAnimationFrame for smoother drawing
+    requestAnimationFrame(() => {
+      if (tool === WHITEBOARD_TOOLS.PEN || tool === WHITEBOARD_TOOLS.ERASER) {
+        ctx.beginPath();
+        ctx.moveTo(startPoint.x, startPoint.y);
+        ctx.lineTo(coords.x, coords.y);
+        ctx.strokeStyle = tool === WHITEBOARD_TOOLS.ERASER ? '#FFFFFF' : color;
+        ctx.lineWidth = strokeSize;
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        ctx.stroke();
+        
+        setStartPoint(coords);
+      } else if (tool === WHITEBOARD_TOOLS.RECTANGLE || tool === WHITEBOARD_TOOLS.CIRCLE) {
+        // Clear canvas and restore previous state
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        if (currentImageData) {
+          ctx.putImageData(currentImageData, 0, 0);
+        }
+        
+        // Draw the shape
+        ctx.beginPath();
+        if (tool === WHITEBOARD_TOOLS.RECTANGLE) {
+          const width = coords.x - startPoint.x;
+          const height = coords.y - startPoint.y;
+          ctx.rect(startPoint.x, startPoint.y, width, height);
+        } else {
+          const radius = Math.sqrt(
+            Math.pow(coords.x - startPoint.x, 2) + 
+            Math.pow(coords.y - startPoint.y, 2)
+          );
+          ctx.arc(startPoint.x, startPoint.y, radius, 0, 2 * Math.PI);
+        }
+        ctx.strokeStyle = color;
+        ctx.lineWidth = strokeSize;
+        ctx.stroke();
       }
-      
-      // Draw the shape
-      ctx.beginPath();
-      if (tool === WHITEBOARD_TOOLS.RECTANGLE) {
-        const width = coords.x - startPoint.x;
-        const height = coords.y - startPoint.y;
-        ctx.rect(startPoint.x, startPoint.y, width, height);
-      } else {
-        const radius = Math.sqrt(
-          Math.pow(coords.x - startPoint.x, 2) + 
-          Math.pow(coords.y - startPoint.y, 2)
-        );
-        ctx.arc(startPoint.x, startPoint.y, radius, 0, 2 * Math.PI);
-      }
-      ctx.strokeStyle = color;
-      ctx.lineWidth = strokeSize;
-      ctx.stroke();
-    }
+    });
   };
 
   const handleEnd = (e) => {
@@ -402,6 +462,9 @@ const Whiteboard = () => {
     saveToHistory(canvas, history, setHistory, currentHistoryIndex, setCurrentHistoryIndex);
     setIsDrawing(false);
     setStartPoint(null);
+    
+    // Mark that we have unsaved changes
+    hasUnsavedChangesRef.current = true;
   };
 
   // Add touch event handlers
@@ -441,7 +504,7 @@ const Whiteboard = () => {
     saveToHistory(canvasRef.current, history, setHistory, currentHistoryIndex, setCurrentHistoryIndex);
   };
 
-  // Save whiteboard
+  // Save whiteboard with optimized saving
   const handleSave = async () => {
     if (!user || !isInitialized) {
       console.error('No user found or canvas not initialized');
@@ -460,8 +523,15 @@ const Whiteboard = () => {
         throw new Error('Canvas not found');
       }
 
+      // Only save if there are actual changes
+      const content = canvas.toDataURL('image/png'); // Use PNG for better quality
+      if (content === lastSavedContentRef.current && lastSaveTime && 
+          (new Date() - new Date(lastSaveTime)) < 60000) { // Less than 1 minute since last save
+        console.log('No changes detected, skipping save');
+        return;
+      }
+
       console.log('Converting canvas to data URL...');
-      const content = canvas.toDataURL('image/png');
       if (!content) {
         console.error('Failed to convert canvas to data URL');
         throw new Error('Failed to convert canvas to data URL');
@@ -480,8 +550,13 @@ const Whiteboard = () => {
       const whiteboardId = await saveWhiteboard(user.uid, whiteboardData);
       console.log('Whiteboard saved successfully with ID:', whiteboardId);
 
-      // Clear local storage after successful save
-      localStorage.removeItem('whiteboard_draft');
+      // Update last saved content and time
+      lastSavedContentRef.current = content;
+      setLastSaveTime(new Date().toISOString());
+      hasUnsavedChangesRef.current = false;
+
+      // Keep the local storage data even after Firestore save
+      // This ensures we don't lose the draft if the user wants to continue editing
     } catch (error) {
       console.error('Error saving whiteboard:', error);
       setError('Failed to save whiteboard: ' + error.message);
@@ -539,6 +614,36 @@ const Whiteboard = () => {
 
     fetchWhiteboards();
   }, [user, whiteboards, saveWhiteboard]);
+
+  // Add effect to track changes for auto-save
+  useEffect(() => {
+    if (isInitialized && canvasRef.current) {
+      hasUnsavedChangesRef.current = true;
+    }
+  }, [currentImageData, tool, color, strokeSize, history, currentHistoryIndex]);
+
+  // Add effect to save to localStorage when component unmounts
+  useEffect(() => {
+    return () => {
+      if (hasUnsavedChangesRef.current) {
+        saveToLocalStorage();
+      }
+    };
+  }, [hasUnsavedChangesRef.current]);
+
+  // Add effect to save to localStorage when window/tab is about to close
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      if (hasUnsavedChangesRef.current) {
+        saveToLocalStorage();
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
+  }, [hasUnsavedChangesRef.current]);
 
   if (contextLoading) {
     console.log('Showing loading state due to context loading');

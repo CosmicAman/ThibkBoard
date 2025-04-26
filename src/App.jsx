@@ -5,6 +5,7 @@ import { NotesProvider } from './context/NotesContext';
 import { WhiteboardProvider } from './context/WhiteboardContext';
 import { PlaygroundProvider } from './context/PlaygroundContext';
 import { CommunityProvider } from './context/CommunityContext';
+import { ChatProvider } from './context/ChatContext';
 import Navbar from './components/Navbar';
 import Login from './components/Auth/Login';
 import Signup from './components/Auth/Signup';
@@ -21,7 +22,6 @@ function App() {
   const [currentPage, setCurrentPage] = useState('home');
   const [authPage, setAuthPage] = useState('login');
   const { user, loading } = useAuth();
-
   useEffect(() => {
     // Handle initial page load and auth state
     const handleInitialLoad = () => {
@@ -76,7 +76,9 @@ function App() {
           <WhiteboardProvider>
             <PlaygroundProvider>
               <CommunityProvider>
-                {renderPage()}
+                <ChatProvider>
+                  {renderPage()}
+                </ChatProvider>
               </CommunityProvider>
             </PlaygroundProvider>
           </WhiteboardProvider>

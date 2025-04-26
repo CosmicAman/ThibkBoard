@@ -4,6 +4,64 @@ import { useAuth } from '../context/AuthContext';
 import { getDocuments } from '../firebase/firestore';
 import './Navbar.css';
 
+const ProfileDropdown = ({ user, onLogout, onToggleTheme, isDarkMode }) => {
+  // Create a separate handler for the toggle switch to prevent event bubbling
+  const handleToggleChange = (e) => {
+    e.stopPropagation(); // Prevent the container click from firing
+    onToggleTheme();
+  };
+
+  return (
+    <div className="profile-dropdown">
+      <div className="profile-header">
+        {user.photoURL ? (
+          <img 
+            src={user.photoURL} 
+            alt={user.displayName || 'User'} 
+            className="profile-picture-large"
+          />
+        ) : (
+          <div className="profile-initials-large">
+            {user.displayName ? user.displayName.charAt(0).toUpperCase() : 'U'}
+          </div>
+        )}
+        <div className="profile-info">
+          <h3>{user.displayName || 'User'}</h3>
+          <p>{user.email}</p>
+        </div>
+      </div>
+      
+      {user.bio && (
+        <div className="profile-bio">
+          {user.bio}
+        </div>
+      )}
+      
+      <div className="profile-actions">
+        <div className="theme-toggle-container">
+          <div className="theme-toggle-label">
+            <span className="theme-icon">{isDarkMode ? '🌙' : '🌙'}</span>
+            <span>{isDarkMode ? 'Dark Mode' : 'Dark Mode'}</span>
+          </div>
+          <label className="toggle-switch">
+            <input 
+              type="checkbox" 
+              checked={isDarkMode} 
+              onChange={handleToggleChange}
+              aria-label={isDarkMode ? "Switch to light mode" : "Switch to dark mode"}
+            />
+            <span className="toggle-slider"></span>
+          </label>
+        </div>
+        
+        <button className="logout-button" onClick={onLogout}>
+          Logout
+        </button>
+      </div>
+    </div>
+  );
+};
+
 const Navbar = ({ currentPage, setCurrentPage }) => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
@@ -14,20 +72,32 @@ const Navbar = ({ currentPage, setCurrentPage }) => {
   });
   const { user } = useAuth();
   const profileRef = useRef(null);
+  const [showProfileDropdown, setShowProfileDropdown] = useState(false);
 
   // Handle click outside to close profile dropdown
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (profileRef.current && !profileRef.current.contains(event.target)) {
-        setIsProfileOpen(false);
+        setShowProfileDropdown(false);
       }
     };
 
+    // Use mousedown instead of click to catch the event before blur
     document.addEventListener('mousedown', handleClickOutside);
+    
+    // Also add a click handler to the document to ensure we catch all clicks
+    document.addEventListener('click', handleClickOutside);
+    
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('click', handleClickOutside);
     };
   }, []);
+
+  // Close dropdown when navigating to a new page
+  useEffect(() => {
+    setShowProfileDropdown(false);
+  }, [currentPage]);
 
   useEffect(() => {
     const fetchUserProfile = async () => {
@@ -101,7 +171,7 @@ const Navbar = ({ currentPage, setCurrentPage }) => {
   const handleLogout = async () => {
     try {
       await logout();
-      setIsProfileOpen(false);
+      setShowProfileDropdown(false);
       setCurrentPage('home');
     } catch (error) {
       console.error('Error logging out:', error);
@@ -115,6 +185,15 @@ const Navbar = ({ currentPage, setCurrentPage }) => {
   const handlePageChange = (pageId) => {
     setCurrentPage(pageId);
     setIsMenuOpen(false);
+  };
+
+  const toggleTheme = () => {
+    setIsDarkMode(prevMode => !prevMode);
+  };
+
+  const toggleProfileDropdown = (e) => {
+    e.stopPropagation(); // Prevent event from bubbling up
+    setShowProfileDropdown(!showProfileDropdown);
   };
 
   const navItems = [
@@ -154,81 +233,31 @@ const Navbar = ({ currentPage, setCurrentPage }) => {
           {user ? (
             <div className="profile-container" ref={profileRef}>
               <div 
-                className="profile-picture-container"
-                onClick={() => setIsProfileOpen(!isProfileOpen)}
+                className="profile-trigger" 
+                onClick={toggleProfileDropdown}
+                aria-expanded={showProfileDropdown}
+                aria-haspopup="true"
               >
-                {userProfile?.photoURL ? (
-                  <img
-                    src={userProfile.photoURL}
-                    alt={userProfile.displayName}
+                {user.photoURL ? (
+                  <img 
+                    src={user.photoURL} 
+                    alt={user.displayName || 'User'} 
                     className="profile-picture"
-                    onError={(e) => {
-                      console.error('Error loading profile picture:', e);
-                      e.target.style.display = 'none';
-                      e.target.nextSibling.style.display = 'flex';
-                    }}
                   />
-                ) : null}
-                <div 
-                  className="profile-initials"
-                  style={{ display: userProfile?.photoURL ? 'none' : 'flex' }}
-                >
-                  {getInitials(userProfile?.displayName)}
-                </div>
+                ) : (
+                  <div className="profile-initials">
+                    {user.displayName ? user.displayName.charAt(0).toUpperCase() : 'U'}
+                  </div>
+                )}
               </div>
               
-              {isProfileOpen && (
-                <div className="profile-dropdown">
-                  <div className="profile-header">
-                    <div className="profile-picture-container-large">
-                      {userProfile?.photoURL ? (
-                        <img
-                          src={userProfile.photoURL}
-                          alt={userProfile.displayName}
-                          className="profile-picture-large"
-                          onError={(e) => {
-                            console.error('Error loading large profile picture:', e);
-                            e.target.style.display = 'none';
-                            e.target.nextSibling.style.display = 'flex';
-                          }}
-                        />
-                      ) : null}
-                      <div 
-                        className="profile-initials-large"
-                        style={{ display: userProfile?.photoURL ? 'none' : 'flex' }}
-                      >
-                        {getInitials(userProfile?.displayName)}
-                      </div>
-                    </div>
-                    <div className="profile-info">
-                      <h3>{userProfile?.displayName}</h3>
-                      <p>{userProfile?.email}</p>
-                    </div>
-                  </div>
-                  
-                  <div className="profile-bio">
-                    {userProfile?.bio || 'No bio available'}
-                  </div>
-                  
-                  <div className="profile-actions">
-                    <button
-                      className="theme-toggle-button"
-                      onClick={() => setIsDarkMode(!isDarkMode)}
-                    >
-                      <span className="theme-icon">
-                        {isDarkMode ? '☀️' : '🌙'}
-                      </span>
-                      {isDarkMode ? 'Light Mode' : 'Dark Mode'}
-                    </button>
-                    
-                    <button
-                      className="logout-button"
-                      onClick={handleLogout}
-                    >
-                      Logout
-                    </button>
-                  </div>
-                </div>
+              {showProfileDropdown && (
+                <ProfileDropdown 
+                  user={user}
+                  onLogout={handleLogout}
+                  onToggleTheme={toggleTheme}
+                  isDarkMode={isDarkMode}
+                />
               )}
             </div>
           ) : (

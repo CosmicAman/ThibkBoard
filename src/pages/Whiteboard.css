@@ -245,6 +245,10 @@
     padding: 0.3rem;
     font-size: 0.75rem;
     min-width: 32px;
+    color: var(--text-color);
+    background-color: var(--card-background);
+    border-color: var(--border-color);
+    transition: color 0.3s ease, background-color 0.3s ease;
   }
 
   .color-picker {

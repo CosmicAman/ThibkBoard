@@ -15,14 +15,29 @@ import {
   serverTimestamp,
   arrayUnion,
   arrayRemove,
-  setDoc
+  setDoc,
+  writeBatch
 } from 'firebase/firestore';
 
 const db = getFirestore(app);
 
+// Cache for document references
+const docRefCache = {};
+
+// Cache for document data
+const docDataCache = {};
+const docDataCacheExpiry = {};
+
+// Cache expiry time (5 minutes)
+const CACHE_EXPIRY_TIME = 5 * 60 * 1000;
+
 // Helper function to get a document reference
 export const getDocRef = (collectionName, docId) => {
-  return doc(db, collectionName, docId);
+  const cacheKey = `${collectionName}/${docId}`;
+  if (!docRefCache[cacheKey]) {
+    docRefCache[cacheKey] = doc(db, collectionName, docId);
+  }
+  return docRefCache[cacheKey];
 };
 
 // Helper function to get a collection reference
@@ -30,14 +45,43 @@ export const getCollectionRef = (collectionName) => {
   return collection(db, collectionName);
 };
 
+// Helper function to check if cache is valid
+const isCacheValid = (cacheKey) => {
+  return docDataCache[cacheKey] && 
+         docDataCacheExpiry[cacheKey] && 
+         Date.now() < docDataCacheExpiry[cacheKey];
+};
+
+// Helper function to set cache
+const setCache = (cacheKey, data) => {
+  docDataCache[cacheKey] = data;
+  docDataCacheExpiry[cacheKey] = Date.now() + CACHE_EXPIRY_TIME;
+};
+
+// Helper function to clear cache
+const clearCache = (cacheKey) => {
+  delete docDataCache[cacheKey];
+  delete docDataCacheExpiry[cacheKey];
+};
+
 // Get a single document
 export const getDocument = async (collectionName, docId) => {
   try {
+    const cacheKey = `${collectionName}/${docId}`;
+    
+    // Check cache first
+    if (isCacheValid(cacheKey)) {
+      console.log(`Using cached document: ${cacheKey}`);
+      return docDataCache[cacheKey];
+    }
+    
     const docRef = getDocRef(collectionName, docId);
     const docSnap = await getDoc(docRef);
     
     if (docSnap.exists()) {
-      return { id: docSnap.id, ...docSnap.data() };
+      const data = { id: docSnap.id, ...docSnap.data() };
+      setCache(cacheKey, data);
+      return data;
     }
     return null;
   } catch (error) {
@@ -51,6 +95,16 @@ export const getDocuments = async (collectionName, filters = []) => {
   try {
     const collectionRef = collection(db, collectionName);
     let queryRef = collectionRef;
+    
+    // Create a cache key based on filters
+    const filterKey = JSON.stringify(filters);
+    const cacheKey = `${collectionName}:${filterKey}`;
+    
+    // Check cache first
+    if (isCacheValid(cacheKey)) {
+      console.log(`Using cached documents: ${cacheKey}`);
+      return docDataCache[cacheKey];
+    }
     
     // Handle both array and object filter formats
     if (Array.isArray(filters)) {
@@ -74,10 +128,15 @@ export const getDocuments = async (collectionName, filters = []) => {
     }
 
     const querySnapshot = await getDocs(queryRef);
-    return querySnapshot.docs.map(doc => ({
+    const results = querySnapshot.docs.map(doc => ({
       id: doc.id,
       ...doc.data()
     }));
+    
+    // Cache the results
+    setCache(cacheKey, results);
+    
+    return results;
   } catch (error) {
     console.error('Error getting documents:', error);
     throw error;
@@ -99,34 +158,22 @@ export const addDocument = async (collectionName, data) => {
     }
 
     const collectionRef = getCollectionRef(collectionName);
-    if (!collectionRef) {
-      throw new Error('Failed to get collection reference');
-    }
-
-    console.log('Adding document to Firestore...');
     const docRef = await addDoc(collectionRef, {
       ...data,
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp()
     });
-
-    if (!docRef) {
-      throw new Error('Failed to get document reference after creation');
-    }
-
-    if (!docRef.id) {
-      throw new Error('Document created but no ID returned');
-    }
-
-    console.log(`Document successfully created in ${collectionName} with ID:`, docRef.id);
+    
+    // Clear collection cache to ensure fresh data on next fetch
+    Object.keys(docDataCache).forEach(key => {
+      if (key.startsWith(`${collectionName}:`)) {
+        clearCache(key);
+      }
+    });
+    
     return docRef;
   } catch (error) {
-    console.error(`Error adding document to ${collectionName}:`, error);
-    console.error('Error details:', {
-      code: error.code,
-      message: error.message,
-      stack: error.stack
-    });
+    console.error('Error adding document:', error);
     throw error;
   }
 };
@@ -135,10 +182,24 @@ export const addDocument = async (collectionName, data) => {
 export const updateDocument = async (collectionName, docId, data) => {
   try {
     const docRef = getDocRef(collectionName, docId);
+    
+    // Update the document
     await updateDoc(docRef, {
       ...data,
       updatedAt: serverTimestamp()
     });
+    
+    // Clear document cache
+    clearCache(`${collectionName}/${docId}`);
+    
+    // Clear collection cache to ensure fresh data on next fetch
+    Object.keys(docDataCache).forEach(key => {
+      if (key.startsWith(`${collectionName}:`)) {
+        clearCache(key);
+      }
+    });
+    
+    return true;
   } catch (error) {
     console.error('Error updating document:', error);
     throw error;
@@ -150,17 +211,61 @@ export const deleteDocument = async (collectionName, docId) => {
   try {
     const docRef = getDocRef(collectionName, docId);
     await deleteDoc(docRef);
+    
+    // Clear document cache
+    clearCache(`${collectionName}/${docId}`);
+    
+    // Clear collection cache to ensure fresh data on next fetch
+    Object.keys(docDataCache).forEach(key => {
+      if (key.startsWith(`${collectionName}:`)) {
+        clearCache(key);
+      }
+    });
+    
+    return true;
   } catch (error) {
     console.error('Error deleting document:', error);
     throw error;
   }
 };
 
-// Notes specific operations
+// Batch update multiple documents
+export const batchUpdateDocuments = async (updates) => {
+  try {
+    const batch = writeBatch(db);
+    
+    updates.forEach(({ collectionName, docId, data }) => {
+      const docRef = getDocRef(collectionName, docId);
+      batch.update(docRef, {
+        ...data,
+        updatedAt: serverTimestamp()
+      });
+    });
+    
+    await batch.commit();
+    
+    // Clear all affected caches
+    updates.forEach(({ collectionName, docId }) => {
+      clearCache(`${collectionName}/${docId}`);
+      
+      // Clear collection cache
+      Object.keys(docDataCache).forEach(key => {
+        if (key.startsWith(`${collectionName}:`)) {
+          clearCache(key);
+        }
+      });
+    });
+    
+    return true;
+  } catch (error) {
+    console.error('Error batch updating documents:', error);
+    throw error;
+  }
+};
+
+// Notes operations
 export const getNotes = async (userId) => {
-  return getDocuments('notes', [
-    { field: 'userId', operator: '==', value: userId }
-  ]);
+  return getDocuments('notes', [['userId', '==', userId]]);
 };
 
 export const getNote = async (noteId) => {
@@ -168,7 +273,7 @@ export const getNote = async (noteId) => {
 };
 
 export const createNote = async (userId, noteData) => {
-  return addDocument('notes', { userId, ...noteData });
+  return addDocument('notes', { ...noteData, userId });
 };
 
 export const updateNote = async (noteId, noteData) => {
@@ -179,11 +284,9 @@ export const deleteNote = async (noteId) => {
   return deleteDocument('notes', noteId);
 };
 
-// Whiteboard specific operations
+// Whiteboard operations
 export const getWhiteboards = async (userId) => {
-  return getDocuments('whiteboards', [
-    { field: 'userId', operator: '==', value: userId }
-  ]);
+  return getDocuments('whiteboards', [['userId', '==', userId]]);
 };
 
 export const getWhiteboard = async (whiteboardId) => {
@@ -191,12 +294,10 @@ export const getWhiteboard = async (whiteboardId) => {
 };
 
 export const createWhiteboard = async (userId, whiteboardData) => {
-  return addDocument('whiteboards', {
+  return addDocument('whiteboards', { 
+    ...whiteboardData, 
     userId,
-    title: whiteboardData.title || 'Untitled Whiteboard',
-    content: whiteboardData.content || '',
-    sharedWith: [],
-    ...whiteboardData
+    sharedWith: []
   });
 };
 
@@ -209,65 +310,56 @@ export const deleteWhiteboard = async (whiteboardId) => {
 };
 
 export const shareWhiteboard = async (whiteboardId, userId) => {
-  return updateDocument('whiteboards', whiteboardId, {
-    sharedWith: arrayUnion(userId)
+  const docRef = getDocRef('whiteboards', whiteboardId);
+  await updateDoc(docRef, {
+    sharedWith: arrayUnion(userId),
+    updatedAt: serverTimestamp()
   });
+  
+  // Clear caches
+  clearCache(`whiteboards/${whiteboardId}`);
+  Object.keys(docDataCache).forEach(key => {
+    if (key.startsWith('whiteboards:')) {
+      clearCache(key);
+    }
+  });
+  
+  return true;
 };
 
 export const unshareWhiteboard = async (whiteboardId, userId) => {
-  return updateDocument('whiteboards', whiteboardId, {
-    sharedWith: arrayRemove(userId)
+  const docRef = getDocRef('whiteboards', whiteboardId);
+  await updateDoc(docRef, {
+    sharedWith: arrayRemove(userId),
+    updatedAt: serverTimestamp()
+  });
+  
+  // Clear caches
+  clearCache(`whiteboards/${whiteboardId}`);
+  Object.keys(docDataCache).forEach(key => {
+    if (key.startsWith('whiteboards:')) {
+      clearCache(key);
+    }
+  });
+  
+  return true;
+};
+
+// User operations
+export const createUser = async (userData) => {
+  return addDocument('users', {
+    ...userData,
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp()
   });
 };
 
-// User specific operations
-export const createUser = async (userData) => {
-  try {
-    console.log('Creating user document:', userData);
-    const userRef = doc(db, 'users', userData.uid);
-    await setDoc(userRef, {
-      ...userData,
-      createdAt: serverTimestamp(),
-      updatedAt: serverTimestamp(),
-      lastSeen: serverTimestamp()
-    });
-    console.log('User document created successfully');
-    return userRef;
-  } catch (error) {
-    console.error('Error creating user document:', error);
-    throw error;
-  }
-};
-
 export const updateUser = async (uid, userData) => {
-  try {
-    console.log('Updating user document:', uid, userData);
-    const userRef = doc(db, 'users', uid);
-    await updateDoc(userRef, {
-      ...userData,
-      updatedAt: serverTimestamp(),
-      lastSeen: serverTimestamp()
-    });
-    console.log('User document updated successfully');
-    return userRef;
-  } catch (error) {
-    console.error('Error updating user document:', error);
-    throw error;
-  }
+  return updateDocument('users', uid, userData);
 };
 
 export const getUser = async (uid) => {
-  try {
-    const userRef = doc(db, 'users', uid);
-    const userSnap = await getDoc(userRef);
-    if (userSnap.exists()) {
-      return { id: userSnap.id, ...userSnap.data() };
-    }
-    return null;
-  } catch (error) {
-    console.error('Error getting user document:', error);
-    throw error;
-  }
+  return getDocument('users', uid);
 };
 
 export default db; 

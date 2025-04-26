@@ -161,11 +161,13 @@ export const logout = async () => {
     if (user) {
       try {
         // Try to update user status before signing out
-        await updateUser(user.uid, {
+        const userRef = doc(db, 'users', user.uid);
+        await updateDoc(userRef, {
           onlineStatus: false,
           lastSeen: new Date(),
           updatedAt: new Date()
         });
+        console.log('User online status updated to offline');
       } catch (updateError) {
         // If the user document doesn't exist, just log the error and continue
         console.warn('User document not found during logout:', updateError);
