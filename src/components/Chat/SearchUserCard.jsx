@@ -1,7 +1,7 @@
 import React from 'react';
 import './SearchUserCard.css';
 
-const SearchUserCard = ({ user, onAddFriend, isFriend, hasRequest }) => {
+const SearchUserCard = ({ user, onAddFriend, onCancelRequest, isFriend, hasRequest }) => {
   const getInitials = (name) => {
     if (!name) return '?';
     return name
@@ -28,13 +28,22 @@ const SearchUserCard = ({ user, onAddFriend, isFriend, hasRequest }) => {
         <h4>{user.username || 'Unknown User'}</h4>
         <p>{user.email || 'No email provided'}</p>
       </div>
-      <button
-        className="add-friend-btn"
-        onClick={() => onAddFriend(user)}
-        disabled={isFriend || hasRequest}
-      >
-        {isFriend ? 'Friends' : hasRequest ? 'Request Sent' : 'Add Friend'}
-      </button>
+      {hasRequest ? (
+        <button
+          className="cancel-request-btn"
+          onClick={() => onCancelRequest(user)}
+        >
+          Cancel Request
+        </button>
+      ) : (
+        <button
+          className="add-friend-btn"
+          onClick={() => onAddFriend(user)}
+          disabled={isFriend}
+        >
+          {isFriend ? 'Friends' : 'Add Friend'}
+        </button>
+      )}
     </div>
   );
 };

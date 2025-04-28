@@ -24,6 +24,7 @@
   --community-header-color: rgb(245, 245, 220);
   --bg-color: rgb(255, 255, 255);
   --surface-color: rgb(255, 255, 255);
+  --search-friend-text-color: rgb(0, 0, 0);
   
   /* Spacing */
   --spacing-xs: 0.25rem;
@@ -70,6 +71,7 @@
   --community-header-color: rgb(32, 32, 32);
   --bg-color: rgb(32, 32, 32);
   --surface-color: rgb(32, 32, 32);
+  --search-friend-text-color: rgb(255, 255, 255);
 }
 
 * {

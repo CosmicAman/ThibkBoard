@@ -225,6 +225,46 @@ export const ChatProvider = ({ children }) => {
     }
   };
 
+  // Cancel friend request
+  const cancelFriendRequest = async (targetUserId) => {
+    try {
+      setLoading(true);
+      const userRef = doc(db, 'users', user.uid);
+      const targetUserRef = doc(db, 'users', targetUserId);
+
+      // Get current user data
+      const userDoc = await getDoc(userRef);
+      const userData = userDoc.data();
+      
+      // Get target user data
+      const targetUserDoc = await getDoc(targetUserRef);
+      const targetUserData = targetUserDoc.data();
+
+      // Check if request exists
+      if (!userData.outgoingFriendRequests?.includes(targetUserId)) {
+        throw new Error('No friend request found to cancel');
+      }
+
+      // Remove from current user's outgoing requests
+      await updateDoc(userRef, {
+        outgoingFriendRequests: arrayRemove(targetUserId)
+      });
+
+      // Remove from target user's incoming requests
+      await updateDoc(targetUserRef, {
+        incomingFriendRequests: arrayRemove(user.uid)
+      });
+
+      console.log('Friend request cancelled successfully');
+      return { success: true };
+    } catch (error) {
+      console.error('Error cancelling friend request:', error);
+      throw error;
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // Send message
   const sendMessage = async (chatId, message) => {
     try {
@@ -371,6 +411,7 @@ export const ChatProvider = ({ children }) => {
     sendFriendRequest,
     acceptFriendRequest,
     rejectFriendRequest,
+    cancelFriendRequest,
     sendMessage,
     setActiveChat
   };
