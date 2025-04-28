@@ -106,19 +106,27 @@ export const ChatProvider = ({ children }) => {
         throw new Error('Friend request already sent');
       }
 
+      // Check if already friends
+      if (userData.friends?.includes(targetUserId)) {
+        throw new Error('Already friends with this user');
+      }
+
       // Initialize arrays if they don't exist
       const currentOutgoingRequests = userData.outgoingFriendRequests || [];
       const currentIncomingRequests = targetUserData.incomingFriendRequests || [];
 
       // Update current user's outgoing requests
       await updateDoc(userRef, {
-        outgoingFriendRequests: [...currentOutgoingRequests, targetUserId]
+        outgoingFriendRequests: arrayUnion(targetUserId)
       });
 
       // Update target user's incoming requests
       await updateDoc(targetUserRef, {
-        incomingFriendRequests: [...currentIncomingRequests, user.uid]
+        incomingFriendRequests: arrayUnion(user.uid)
       });
+
+      // Update local state
+      setOutgoingFriendRequests(prev => [...prev, targetUserId]);
 
       console.log('Friend request sent successfully');
       return { success: true };
